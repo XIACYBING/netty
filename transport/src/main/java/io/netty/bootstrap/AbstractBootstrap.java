@@ -26,6 +26,7 @@ import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ReflectiveChannelFactory;
+import io.netty.channel.nio.AbstractNioMessageChannel;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -49,6 +50,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>When not used in a {@link ServerBootstrap} context, the {@link #bind()} methods are useful for connectionless
  * transports such as datagram (UDP).</p>
+ *
+ * @see Bootstrap
+ * @see ServerBootstrap
  */
 public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C extends Channel> implements Cloneable {
     @SuppressWarnings("unchecked")
@@ -101,9 +105,14 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 设置处理连接的IO模型
+     * <p>
      * The {@link Class} which is used to create {@link Channel} instances from.
      * You either use this or {@link #channelFactory(io.netty.channel.ChannelFactory)} if your
      * {@link Channel} implementation has no no-args constructor.
+     *
+     * @see AbstractNioMessageChannel
+     * @see io.netty.channel.socket.nio.NioServerSocketChannel
      */
     public B channel(Class<? extends C> channelClass) {
         return channelFactory(new ReflectiveChannelFactory<C>(
@@ -261,6 +270,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 绑定一个端口，是个必须的配置项
+     * <p>
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(SocketAddress localAddress) {
@@ -362,7 +373,14 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * channel处理器，用于处理输入或输出的数据流，需要注意，只能设置一个，后者会覆盖前者
+     * <p>
+     * 这是一个可选配置项
+     * <p>
      * the {@link ChannelHandler} to use for serving the requests.
+     *
+     * @see io.netty.channel.ChannelInboundHandler
+     * @see io.netty.channel.ChannelOutboundHandler
      */
     public B handler(ChannelHandler handler) {
         this.handler = ObjectUtil.checkNotNull(handler, "handler");

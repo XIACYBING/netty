@@ -147,6 +147,8 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
     SocketAddress remoteAddress();
 
     /**
+     * 监听端口是否关闭
+     * <p>
      * Returns the {@link ChannelFuture} which will be notified when this
      * channel is closed.  This method always returns the same future instance.
      */
