@@ -37,8 +37,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 服务端引导启动类
+ * <p>
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
- *
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {
 
@@ -73,6 +74,8 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * parentGroup主要用来处理accept事件，childGroup则用来处理读写事件
+     * <p>
      * Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client). These
      * {@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and
      * {@link Channel}'s.
@@ -127,7 +130,15 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     }
 
     /**
+     * 设置子级的{@link ChannelHandler}，在{@link ServerBootstrap}中这是必须配置的，主要用来处理
+     * {@link io.netty.channel.socket.SocketChannel}的相关事件
+     * <p>
+     * 虽然只能设置一个，但是我们可以使用{@link ChannelInitializer#initChannel(Channel)}，通过
+     * {@link Channel#pipeline()}添加多个更子级的{@link ChannelHandler}，组成一条管道来处理输入输出数据
+     * <p>
      * Set the {@link ChannelHandler} which is used to serve the request for the {@link Channel}'s.
+     *
+     * @see #handler(ChannelHandler)
      */
     public ServerBootstrap childHandler(ChannelHandler childHandler) {
         if (childHandler == null) {

@@ -18,9 +18,10 @@ package io.netty.channel;
 import io.netty.util.concurrent.EventExecutorGroup;
 
 /**
+ * 处理相关事件，比如TCP协议下会有BoostGroup和WorkerGroup，前者一般声明少数线程（一般是一个）来处理accept事件，后者按照需求声明线程数来处理读写事件
+ * <p>
  * Special {@link EventExecutorGroup} which allows registering {@link Channel}s that get
  * processed for later selection during the event loop.
- *
  */
 public interface EventLoopGroup extends EventExecutorGroup {
     /**

@@ -81,6 +81,8 @@ public interface Future<V> extends java.util.concurrent.Future<V> {
     Future<V> removeListeners(GenericFutureListener<? extends Future<? super V>>... listeners);
 
     /**
+     * 阻塞线程直到当前future完成
+     * <p>
      * Waits for this future until it is done, and rethrows the cause of the failure if this future
      * failed.
      */
