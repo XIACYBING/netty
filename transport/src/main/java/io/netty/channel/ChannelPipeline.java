@@ -29,6 +29,11 @@ import java.util.NoSuchElementException;
 
 
 /**
+ * {@link ChannelHandler}的管道，通过{@link ChannelPipeline}将多个{@link ChannelHandler}链接起来以供{@link Channel}进行数据处理
+ *
+ * 一个{@link Channel}关联着一个{@link ChannelPipeline}，一个{@link ChannelPipeline}中包含着一条双向的{@link ChannelHandlerContext}链，每个
+ * {@link ChannelHandlerContext}中会关联着一个{@link ChannelHandler}
+ *
  * A list of {@link ChannelHandler}s which handles or intercepts inbound events and outbound operations of a
  * {@link Channel}.  {@link ChannelPipeline} implements an advanced form of the
  * <a href="http://www.oracle.com/technetwork/java/interceptingfilter-142169.html">Intercepting Filter</a> pattern

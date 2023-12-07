@@ -20,9 +20,11 @@ import io.netty.channel.ChannelHandlerMask.Skip;
 import java.net.SocketAddress;
 
 /**
+ * 入口流量处理器和出口流量处理器的双向继承实现，子类可以通过继承该类，来对出入口流量做拦截处理
+ * <p>
  * {@link ChannelHandler} implementation which represents a combination out of a {@link ChannelInboundHandler} and
  * the {@link ChannelOutboundHandler}.
- *
+ * <p>
  * It is a good starting point if your {@link ChannelHandler} implementation needs to intercept operations and also
  * state updates.
  */

@@ -20,6 +20,9 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.util.internal.UnstableApi;
 
+/**
+ * 更偏向使用直接内存来生成{@link ByteBuf}，但是也可以指定堆内存生成{@link ByteBuf}
+ */
 @UnstableApi
 public final class PreferredDirectByteBufAllocator implements ByteBufAllocator {
     private ByteBufAllocator allocator;

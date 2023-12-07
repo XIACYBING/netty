@@ -22,10 +22,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 事件执行器组，是{@link EventExecutor}的容器，主要用来获取和管理{@link EventExecutor}的生命周期
+ * <p>
  * The {@link EventExecutorGroup} is responsible for providing the {@link EventExecutor}'s to use
  * via its {@link #next()} method. Besides this, it is also responsible for handling their
  * life-cycle and allows shutting them down in a global fashion.
- *
  */
 public interface EventExecutorGroup extends ScheduledExecutorService, Iterable<EventExecutor> {
 

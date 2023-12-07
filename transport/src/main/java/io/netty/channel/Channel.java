@@ -15,6 +15,8 @@
  */
 package io.netty.channel;
 
+import com.sun.nio.sctp.SctpChannel;
+import com.sun.nio.sctp.SctpServerChannel;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.socket.DatagramChannel;
@@ -26,8 +28,64 @@ import io.netty.util.AttributeMap;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-
 /**
+ * <ol>
+ *     基于NIO的{@link java.nio.channels.Channel}进行封装，并提供了一些更好用的功能
+ *     <li>
+ *         可以获取当前连接的状态及{@link #config() 配置参数}
+ *         <br>
+ *         状态：
+ *         <ol>
+ *             <li>{@link #isOpen()}：channel已经被创建且开启，但是可能还未绑定任何地址或者链接到远程服务器</li>
+ *             <li>{@link #isActive()}：channel已经链接到远程服务器，这时候可以通过{@link #writeAndFlush}进行数据发送了</li>
+ *             <li>{@link #isRegistered()}： channel是否注册到一个{@link EventLoop}上等待处理</li>
+ *             <li>{@link #isWritable()}：channel的写操作是否可以立刻被IO线程处理，当返回false时，channel的任何写操作都会被阻塞，直到IO
+ *             线程有能力来处理写请求；需要注意的是，当前方法并不代表channel是否可写，而是代表channel的写操作是否立刻被IO线程处理</li>
+ *         </ol>
+ *     </li>
+ *     <li>通过{@link #pipeline() ChannelPipeline}来处理IO事件</li>
+ *     <li>在 Netty 中的所有 IO 操作都是异步的</li>
+ *     <li>可继承的 Channel 体系</li>
+ * </ol>
+ *
+ * <ol>
+ *     针对各协议的实现
+ *     <li>
+ *         TCP协议：
+ *         <ol>
+ *             <li>{@link SocketChannel}</li>
+ *             <li>{@link ServerSocketChannel}</li>
+ *         </ol>
+ *     </li>
+ *     <li>UDP协议：{@link DatagramChannel}</li>
+ *     <li>
+ *         SCTP协议，需要注意的是，netty在实现当前协议时，使用的包路径和JDK中完全一致：
+ *         <ol>
+ *             <li>{@link SctpChannel}</li>
+ *             <li>{@link SctpServerChannel}</li>
+ *         </ol>
+ *     </li>
+ *     <li>RXTX协议（已废弃）：{@link io.netty.channel.rxtx.RxtxChannel}</li>
+ *     <li>UDT协议（已废弃）：{@link io.netty.channel.udt.UdtChannel}</li>
+ * </ol>
+ *
+ * <ol>
+ *     {@link Channel}关联关系：
+ *     <li>{@link EventLoopGroup}下包含着着多个{@link EventLoop}</li>
+ *     <li>每个{@link io.netty.channel.nio.NioEventLoop}会关联着一个{@link java.nio.channels.Selector}</li>
+ *     <li>每个{@link java.nio.channels.Selector}上注册着多个{@link Channel}</li>
+ *     <li>每个{@link Channel}关联着一个{@link ChannelPipeline}</li>
+ *     <li>每个{@link ChannelPipeline}关联着一条{@link ChannelHandlerContext}双向链</li>
+ *     <li>每个{@link ChannelHandlerContext}中关联着一个{@link ChannelHandler}</li>
+ * </ol>
+ *
+ * <ol>
+ *     NIO场景下的一些注意点：
+ *     <ul>存疑：因为{@link io.netty.channel.nio.NioEventLoop}是一个单线程池，所以注册在其上{@link Channel}的IO事件都只会在一个线程中处理完成</ul>
+ *     <ul>每个{@link ChannelHandlerContext}都只能被一个{@link ChannelPipeline}关联，但是其内的{@link ChannelHandler}可以被多个
+ *     {@link ChannelHandlerContext}关联，所以需要注意{@link ChannelHandler}不是线程安全的</ul>
+ * </ol>
+ *
  * A nexus to a network socket or a component which is capable of I/O
  * operations such as read, write, connect, and bind.
  * <p>

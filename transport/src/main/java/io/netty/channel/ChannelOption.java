@@ -24,7 +24,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 /**
- * channel的配置参数
+ * {@link Channel}的配置参数
  * <p>
  * A {@link ChannelOption} allows to configure a {@link ChannelConfig} in a type-safe
  * way. Which {@link ChannelOption} is supported depends on the actual implementation

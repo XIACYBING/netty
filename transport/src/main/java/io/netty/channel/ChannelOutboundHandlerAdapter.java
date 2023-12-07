@@ -20,6 +20,10 @@ import io.netty.channel.ChannelHandlerMask.Skip;
 import java.net.SocketAddress;
 
 /**
+ * {@link ChannelOutboundHandler}的基础实现，当前实现只是将所有方法调用转发给{@link ChannelHandlerContext}，不做其他的任何处理
+ * <p>
+ * 子类可以通过继承当前方法来实现自己的业务逻辑
+ * <p>
  * Skeleton implementation of a {@link ChannelOutboundHandler}. This implementation just forwards each method call via
  * the {@link ChannelHandlerContext}.
  */

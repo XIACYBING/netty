@@ -41,6 +41,10 @@ import java.util.concurrent.TimeUnit;
 /**
  * 服务端引导启动类
  * <p>
+ * 相比于客户端启动引导类，服务端启动引导类多出一些关于连接{@code accept}的处理配置，体现在{@code child*}相关的方法上，比如{@link #childHandler()}、
+ * {@link #childOptions()}和{@link #childAttrs()}等，但是没有{@code childChannel()}方法，因为{@code childChannel/SocketChannel}是由
+ * {@code ServerSocketChannel}创建，有其他的处理路径
+ * <p>
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {

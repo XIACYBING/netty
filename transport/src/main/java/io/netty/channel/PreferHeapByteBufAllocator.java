@@ -22,6 +22,8 @@ import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 /**
+ * 更偏向使用堆内存分配{@link ByteBuf}，但是也支持指定分配直接内存{@link #directBuffer}给{@link ByteBuf}
+ * <p>
  * Wraps another {@link ByteBufAllocator} and use heapbuffers everywhere except when a direct buffer is explicit
  * requested.
  */

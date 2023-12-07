@@ -19,6 +19,9 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.TypeParameterMatcher;
 
 /**
+ * 当前抽象类相比于{@link ChannelInboundHandlerAdapter}，在{@link #channelRead}增加了资源释放逻辑
+ * {@link ReferenceCountUtil#release(Object)}，而子类则通过实现{@link #channelRead0(ChannelHandlerContext, Object)}来实现具体的入口流量处理逻辑
+ *
  * {@link ChannelInboundHandlerAdapter} which allows to explicit only handle a specific type of messages.
  *
  * For example here is an implementation which only handle {@link String} messages.

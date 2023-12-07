@@ -16,8 +16,8 @@
 package io.netty.channel.nio;
 
 import io.netty.channel.Channel;
-import io.netty.channel.EventLoop;
 import io.netty.channel.DefaultSelectStrategyFactory;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopTaskQueueFactory;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SelectStrategyFactory;
@@ -32,6 +32,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
+ * 管理{@link NioEventLoop}，在{@link NioEventLoop}的每个线程中，使用NIO的{@link Selector}来处理事件
+ * <p>
  * {@link MultithreadEventLoopGroup} implementations which is used for NIO {@link Selector} based {@link Channel}s.
  */
 public class NioEventLoopGroup extends MultithreadEventLoopGroup {

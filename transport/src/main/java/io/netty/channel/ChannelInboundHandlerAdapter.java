@@ -18,6 +18,10 @@ package io.netty.channel;
 import io.netty.channel.ChannelHandlerMask.Skip;
 
 /**
+ * {@link ChannelInboundHandler}的基础实现，只是将入口流量转发到下一个{@link ChannelHandler}节点，不做任何处理
+ *
+ * 子类可以通过继承当前类，重写相关操作方法来实现自己的逻辑
+ *
  * Abstract base class for {@link ChannelInboundHandler} implementations which provide
  * implementations of all of their methods.
  *

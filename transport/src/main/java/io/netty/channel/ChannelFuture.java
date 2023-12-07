@@ -24,6 +24,8 @@ import java.util.concurrent.TimeUnit;
 
 
 /**
+ * {@link Channel}中所有操作都是异步的，当前{@link ChannelFuture}就是用来承载这些异步IO操作的结果的
+ *
  * The result of an asynchronous {@link Channel} I/O operation.
  * <p>
  * All I/O operations in Netty are asynchronous.  It means any I/O calls will

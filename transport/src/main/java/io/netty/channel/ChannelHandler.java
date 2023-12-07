@@ -26,6 +26,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
+ * 核心业务的处理接口，用于处理或拦截{@link Channel}中的IO事件，然后将其转发到下一个{@link ChannelHandler}节点，该流程中运用的是责任链模式，具体可以参考{@link ChannelPipeline}
+ *
+ * <ol>
+ *     {@link ChannelHandler}的实现主要分为两种，一种用于拦截入口流量，一种用于拦截出口流量，对于一个{@link ChannelHandler}的实现类来说，也可以两个都继承
+ *     <li>入口流量处理：{@link ChannelInboundHandler}</li>
+ *     <li>出口流量处理：{@link ChannelOutboundHandler}</li>
+ *     <li>出入口流量拦截：{@link ChannelDuplexHandler}</li>
+ * </ol>
+ *
  * Handles an I/O event or intercepts an I/O operation, and forwards it to its next handler in
  * its {@link ChannelPipeline}.
  *

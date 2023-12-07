@@ -27,8 +27,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
+ * 单线程处理事件的{@link EventLoop}抽象实现，大多数在用的{@link EventLoop}实现类都继承当前抽象类，比如{@link io.netty.channel.nio.NioEventLoop}
+ * <p>
  * Abstract base class for {@link EventLoop}s that execute all its submitted tasks in a single thread.
- *
  */
 public abstract class SingleThreadEventLoop extends SingleThreadEventExecutor implements EventLoop {
 

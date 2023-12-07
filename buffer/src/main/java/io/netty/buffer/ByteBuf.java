@@ -16,6 +16,7 @@
 package io.netty.buffer;
 
 import io.netty.util.ByteProcessor;
+import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
@@ -30,6 +31,24 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 
 /**
+ * <h3>说明</h3>
+ *
+ * 基于NIO的{@link ByteBuffer}，在是否池化{@code pooled}、堆/直接内存{@code heap/direct}和是否安全{@code safe}三个纬度上去组合实现
+ *
+ * 池化：初始化时向虚拟机申请一块内存作为内存池使用，创建{@link ByteBuf}时则从该内存池中提取一块连续的内存使用，{@link ByteBuf}使用完成后将该内存放回内存池中，使用
+ * {@link Recycler.Handle}进行对象的生命周期管理；
+ *
+ * 非池化则是直接利用JVM本身的内存管理能力来管理对象的生命周期，即我们平时使用NIO{@link ByteBuffer}的那种方式
+ *
+ * 堆内存和直接内存：和NIO的{@link ByteBuffer}一样，代表从哪里申请内存，堆内存即是JVM本身的堆内存，直接内存则是直接向操作系统申请内存，独立于JVM内存
+ *
+ * 安全和非安全：非安全是指直接使用Java本身的{@link sun.misc.Unsafe}来操作底层数据结构，直接利用对象在内存中的指针来进行操作，会比较危险
+ *
+ * <h3>ByteBuf创建</h3>
+ * {@link ByteBuf}的创建则是基于{@link ByteBufAllocator}来进行分配内存创建，可以根据不同情况使用不同实现类
+ *
+ * <h3>其他说明</h3>
+ *
  * A random and sequential accessible sequence of zero or more bytes (octets).
  * This interface provides an abstract view for one or more primitive byte
  * arrays ({@code byte[]}) and {@linkplain ByteBuffer NIO buffers}.

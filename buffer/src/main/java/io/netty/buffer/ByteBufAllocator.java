@@ -16,11 +16,18 @@
 package io.netty.buffer;
 
 /**
+ * {@link ByteBuf}的分配器，基于对应实现类来分配{@link ByteBuf}
+ * <p>
  * Implementations are responsible to allocate buffers. Implementations of this interface are expected to be
  * thread-safe.
  */
 public interface ByteBufAllocator {
 
+    /**
+     * 默认内存分配器，优先池化、unsafe和直接内存
+     * <p>
+     * 但是在安卓平台下使用非池化，因为安卓平台对池化的支持不好
+     */
     ByteBufAllocator DEFAULT = ByteBufUtil.DEFAULT_ALLOCATOR;
 
     /**

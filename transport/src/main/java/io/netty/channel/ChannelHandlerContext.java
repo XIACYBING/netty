@@ -25,6 +25,11 @@ import io.netty.util.concurrent.EventExecutor;
 import java.nio.channels.Channels;
 
 /**
+ * {@link ChannelHandler}的上下文，允许{@link ChannelHandler}与其他{@link ChannelHandler}以及{@link ChannelPipeline}进行交互，比如通知下一个
+ * {@link ChannelHandler}，或者动态修改所属的{@link ChannelPipeline}
+ *
+ * 关联着对应的{@link Channel}
+ *
  * Enables a {@link ChannelHandler} to interact with its {@link ChannelPipeline}
  * and other handlers. Among other things a handler can notify the next {@link ChannelHandler} in the
  * {@link ChannelPipeline} as well as modify the {@link ChannelPipeline} it belongs to dynamically.
