@@ -200,6 +200,16 @@
           </commandlineArgs>
         </configuration>
       </plugin>
+
+      <!--不太确认为什么加这个，不加的话好像一些Java8的新特性（比如Supplier）使用时会有一堆警告-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>8</source>
+          <target>8</target>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

@@ -199,10 +199,14 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+
+            // 校验是否独有的ChannelHandler：如果是ChannelHandlerAdapter且没有被Sharable注解标记的，则只能被添加一次
             checkMultiplicity(handler);
 
+            // 创建ChannelHandlerContext，并生成context的name（也可以外部指定），不允许重名
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 将当前节点插入节点链的尾部
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
@@ -214,6 +218,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return this;
             }
 
+            // 如果有EventLoop的线程池，则在线程池中调用callHandlerAdded0，否则在同步块外调用callHandlerAdded0
             EventExecutor executor = newCtx.executor();
             if (!executor.inEventLoop()) {
                 callHandlerAddedInEventLoop(newCtx, executor);
@@ -224,11 +229,28 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return this;
     }
 
+    /**
+     * head - node - ... - node - tail
+     * <p>
+     * 将新节点/newNode插入后：
+     * <p>
+     * head - node - ... - node - newNode - tail
+     */
     private void addLast0(AbstractChannelHandlerContext newCtx) {
+
+        // 获取尾节点的前置节点
         AbstractChannelHandlerContext prev = tail.prev;
+
+        // 将原尾节点前置节点作为新节点的前置节点
         newCtx.prev = prev;
+
+        // 将尾节点作为新节点的后置节点
         newCtx.next = tail;
+
+        // 将新节点作为尾节点原前置节点的后置节点
         prev.next = newCtx;
+
+        // 将新节点作为尾节点的前置节点
         tail.prev = newCtx;
     }
 

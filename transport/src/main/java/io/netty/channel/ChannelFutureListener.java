@@ -20,6 +20,8 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 
 /**
+ * {@link ChannelFuture}的监听器，监听{@link ChannelFuture}的各种结果
+ *
  * Listens to the result of a {@link ChannelFuture}.  The result of the
  * asynchronous {@link Channel} I/O operation is notified once this listener
  * is added by calling {@link ChannelFuture#addListener(GenericFutureListener)}.
@@ -35,6 +37,8 @@ import io.netty.util.concurrent.GenericFutureListener;
 public interface ChannelFutureListener extends GenericFutureListener<ChannelFuture> {
 
     /**
+     * 关闭监听器，当对应{@link ChannelFuture}执行完成后，就关闭关联的{@link Channel}，该操作会导致对应客户端的端口被关闭
+     * <p>
      * A {@link ChannelFutureListener} that closes the {@link Channel} which is
      * associated with the specified {@link ChannelFuture}.
      */
