@@ -12,6 +12,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
+import io.netty.handler.codec.Delimiters;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.logging.LoggingHandler;
@@ -23,6 +25,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.LinkedList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
@@ -68,11 +74,10 @@ public class SingleThreadMode {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        ch
-                            .pipeline()
-                            .addLast(new StringDecoder())
-                            .addLast(new StringEncoder())
-                            .addLast(new SimpleChannelInboundHandler<String>() {
+                        ch.pipeline().addLast(new DelimiterBasedFrameDecoder(1024, Delimiters.lineDelimiter()))
+                          .addLast(new StringDecoder())
+                          .addLast(new StringEncoder())
+                          .addLast(new SimpleChannelInboundHandler<String>() {
 
                                 @Override
                                 public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
@@ -95,7 +100,7 @@ public class SingleThreadMode {
                                     throws InterruptedException {
                                     LOGGER.info("接收到消息：[{}]", msg);
 
-                                    ChannelFuture writeFuture = ctx.writeAndFlush("received :" + msg);
+                                    ChannelFuture writeFuture = ctx.writeAndFlush("received :" + msg + "\r\n");
 
                                     // 如果消息是bye，关闭客户端后并关闭服务端
                                     if (CLOSE_FLAG.equalsIgnoreCase(msg)) {
@@ -113,7 +118,18 @@ public class SingleThreadMode {
                                         }
                                     }
                                 }
-                            });
+
+                              @Override
+                              public void channelReadComplete(ChannelHandlerContext ctx) {
+                                  ctx.flush();
+                              }
+
+                              @Override
+                              public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                                  cause.printStackTrace();
+                                  ctx.close();
+                              }
+                          });
                     }
                 });
 
@@ -147,29 +163,35 @@ public class SingleThreadMode {
             //  同样的，多线程是在server的childHandler中增加多线程处理，每个线程都处理一个请求
             //  主从模式则是指定workerGroup，并在childHandler中使用多线程处理
             //  变异主从模式（Netty默认）则是将workerGroup和childHandler中的线程池合并，只用workerGroup进行数据处理
-            for (int i = 0; i < 5; i++) {
+            int threadNum = 5;
+            ExecutorService executor = Executors.newFixedThreadPool(threadNum);
+            CountDownLatch countDownLatch = new CountDownLatch(5);
 
-                // 初始化消息提供者
-                LinkedList<String> msgList =
-                    Stream.concat(IntStream.range(0, 5).boxed(), Stream.of(CLOSE_FLAG)).map(String::valueOf)
-                          // .map(v -> v + "\r")
-                          .collect(LinkedList::new, LinkedList::add, LinkedList::addAll);
-                Supplier<String> numSupplier = msgList::pop;
+            for (int i = 0; i < threadNum; i++) {
 
-                Supplier<String> consoleSupplier = CONSOLE_MSG_SUPPLIER.get();
+                executor.execute(() -> {
+                    // 初始化消息提供者
+                    LinkedList<String> msgList = Stream
+                        .concat(IntStream.range(0, 5).boxed(), Stream.of(CLOSE_FLAG))
+                        .map(String::valueOf)
+                        .collect(LinkedList::new, LinkedList::add, LinkedList::addAll);
 
-                String num = numSupplier.get();
-                System.out.println(num);
-                String consoleStr = consoleSupplier.get();
-                System.out.println(consoleStr.equals(num));
-
-                // 初始化客户端并发送请求  TODO 莫名其妙的，从控制器读取的数据能正常的发送到server，但是从msgList中获取到的数据就无法发送到server，两者数据是完全一致的，不懂是哪里的问题
-                // initClientSendMsg(CONSOLE_MSG_SUPPLIER.get());
-                // initClientSendMsg(numSupplier);
+                    // 初始化客户端并发送请求
+                    try {
+                        initClientSendMsg(msgList::pop, countDownLatch);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                });
             }
+
+            executor.shutdown();
+            //noinspection ResultOfMethodCallIgnored
+            executor.awaitTermination(10L, TimeUnit.MINUTES);
         }
 
-        static void initClientSendMsg(Supplier<String> msgSupplier) throws InterruptedException {
+        static void initClientSendMsg(Supplier<String> msgSupplier, CountDownLatch countDownLatch)
+            throws InterruptedException {
             Bootstrap client = new Bootstrap();
 
             try {
@@ -181,8 +203,9 @@ public class SingleThreadMode {
                         protected void initChannel(SocketChannel ch) {
                             ch
                                 .pipeline()
-                                .addLast(new StringEncoder())
+                                .addLast(new DelimiterBasedFrameDecoder(1024, Delimiters.lineDelimiter()))
                                 .addLast(new StringDecoder())
+                                .addLast(new StringEncoder())
                                 .addLast(new SimpleChannelInboundHandler<String>() {
                                     @Override
                                     protected void channelRead0(ChannelHandlerContext ctx, String msg) {
@@ -191,7 +214,16 @@ public class SingleThreadMode {
                                 });
                         }
                     });
-                Channel channel = client.connect(new InetSocketAddress(SERVER_PORT)).channel();
+
+                // 之前出现的客户端一直没法向服务端发送消息的原因是sync方法没有被调用，猜测原因应该是实际client并没有连接到server，就在发消息了
+                // 之所以使用System.in能发送成功，应该是因为手动在控制台输入数据需要事件，这个时间段内，client已经连接到server了，因此server能接收到消息
+                Channel channel = client.connect(new InetSocketAddress(SERVER_PORT)).sync().channel();
+
+                // 等待其他线程准备好    todo 好像不行，服务端那边接收到消息的时候一直是按照0-1-2-3-4-bye的顺序来接收，不确认原因
+                countDownLatch.countDown();
+                countDownLatch.await();
+
+                String threadName = Thread.currentThread().getName();
 
                 // 向服务器发送消息
                 while (true) {
@@ -200,7 +232,7 @@ public class SingleThreadMode {
                     String msg = msgSupplier.get();
 
                     // 发送数据
-                    ChannelFuture writeFuture = channel.writeAndFlush(msg);
+                    ChannelFuture writeFuture = channel.writeAndFlush(threadName + ":" + msg + "\r\n");
                     LOGGER.info("写入消息：[{}]", msg);
 
                     // 如果是关闭数据，则先等待写操作完成

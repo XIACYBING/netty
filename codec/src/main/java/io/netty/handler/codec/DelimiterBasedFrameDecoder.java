@@ -15,15 +15,17 @@
  */
 package io.netty.handler.codec;
 
-import static io.netty.util.internal.ObjectUtil.checkPositive;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.internal.ObjectUtil;
 
 import java.util.List;
 
+import static io.netty.util.internal.ObjectUtil.checkPositive;
+
 /**
+ * 粘包拆包解决方案之一：分割符法的解码实现
+ *
  * A decoder that splits the received {@link ByteBuf}s by one or more
  * delimiters.  It is particularly useful for decoding the frames which ends
  * with a delimiter such as {@link Delimiters#nulDelimiter() NUL} or
@@ -60,13 +62,16 @@ import java.util.List;
  */
 public class DelimiterBasedFrameDecoder extends ByteToMessageDecoder {
 
+    /**
+     * 分割符缓存，可以有多个分割符
+     */
     private final ByteBuf[] delimiters;
     private final int maxFrameLength;
     private final boolean stripDelimiter;
     private final boolean failFast;
     private boolean discardingTooLongFrame;
     private int tooLongFrameLength;
-    /** Set only when decoding with "\n" and "\r\n" as the delimiter.  */
+    /** Set only when decoding with "\n" and "\r\n" as the delimiter. */
     private final LineBasedFrameDecoder lineBasedDecoder;
 
     /**

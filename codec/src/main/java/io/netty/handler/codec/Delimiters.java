@@ -19,6 +19,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 /**
+ * 常用的分割符定义
+ * <p>
  * A set of commonly used delimiters for {@link DelimiterBasedFrameDecoder}.
  */
 public final class Delimiters {

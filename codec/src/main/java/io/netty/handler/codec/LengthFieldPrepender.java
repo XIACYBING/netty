@@ -15,8 +15,6 @@
  */
 package io.netty.handler.codec;
 
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -25,8 +23,11 @@ import io.netty.util.internal.ObjectUtil;
 import java.nio.ByteOrder;
 import java.util.List;
 
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
+ * 粘包拆包解决方案之一：长度+内容法的编码实现
+ *
  * An encoder that prepends the length of the message.  The length value is
  * prepended as a binary form.
  * <p>

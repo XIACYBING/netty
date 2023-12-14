@@ -1614,6 +1614,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract ByteBuf readSlice(int length);
 
     /**
+     * 返回一个新的{@link ByteBuf}，从原{@link ByteBuf#readerIndex()}开始读取{@code length}字节的数据并返回
+     *
      * Returns a new retained slice of this buffer's sub-region starting at the current
      * {@code readerIndex} and increases the {@code readerIndex} by the size
      * of the new slice (= {@code length}).

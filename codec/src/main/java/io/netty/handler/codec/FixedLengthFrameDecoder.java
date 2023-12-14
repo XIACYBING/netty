@@ -15,14 +15,16 @@
  */
 package io.netty.handler.codec;
 
-import static io.netty.util.internal.ObjectUtil.checkPositive;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.util.List;
 
+import static io.netty.util.internal.ObjectUtil.checkPositive;
+
 /**
+ * 粘包拆包解决方案之一：定长法的解码实现
+ * <p>
  * A decoder that splits the received {@link ByteBuf}s by the fixed number
  * of bytes. For example, if you received the following four fragmented packets:
  * <pre>
@@ -40,6 +42,9 @@ import java.util.List;
  */
 public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
 
+    /**
+     * 消息的固定长度
+     */
     private final int frameLength;
 
     /**
@@ -70,9 +75,15 @@ public class FixedLengthFrameDecoder extends ByteToMessageDecoder {
      */
     protected Object decode(
             @SuppressWarnings("UnusedParameters") ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+
+        // 如果数据流长度小于定义的消息长度，则不进行读取
+        // todo 对于拆包场景，相关的字节是否会留到下一次去读取？
         if (in.readableBytes() < frameLength) {
             return null;
-        } else {
+        }
+
+        // 否则按照定义好的消息长度进行消息读取，并返回包含对应字节数据的ByteBuf
+        else {
             return in.readRetainedSlice(frameLength);
         }
     }

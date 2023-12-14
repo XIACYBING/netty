@@ -15,17 +15,19 @@
  */
 package io.netty.handler.codec;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
-import static io.netty.util.internal.ObjectUtil.checkPositive;
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
 
 import java.nio.ByteOrder;
 import java.util.List;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
+import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static io.netty.util.internal.ObjectUtil.checkPositive;
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
+ * 粘包拆包解决方案之一：长度+内容法的解码实现
+ *
  * A decoder that splits the received {@link ByteBuf}s dynamically by the
  * value of the length field in the message.  It is particularly useful when you
  * decode a binary message which has an integer header field that represents the
