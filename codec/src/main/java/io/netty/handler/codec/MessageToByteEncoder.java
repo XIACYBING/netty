@@ -27,6 +27,8 @@ import io.netty.util.internal.TypeParameterMatcher;
 
 
 /**
+ * 数据一次编码的抽象类，主要用于读取数据，进行消息边界界定；界定消息边界之前，则是由二次编码类{@link MessageToMessageEncoder}对实际的消息进行包装
+ *
  * {@link ChannelOutboundHandlerAdapter} which encodes message in a stream-like fashion from one message to an
  * {@link ByteBuf}.
  *

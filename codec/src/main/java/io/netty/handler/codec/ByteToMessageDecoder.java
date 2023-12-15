@@ -32,6 +32,8 @@ import static io.netty.util.internal.ObjectUtil.checkPositive;
 import static java.lang.Integer.MAX_VALUE;
 
 /**
+ * 消息一次解码类，主要用于对网络传输来的数据流进行消息边界界定；界定完成之后再由二次解码器{@link MessageToMessageDecoder}将字节数组转换为实际的Java对象
+ *
  * {@link ChannelInboundHandlerAdapter} which decodes bytes in a stream-like fashion from one {@link ByteBuf} to an
  * other Message type.
  *

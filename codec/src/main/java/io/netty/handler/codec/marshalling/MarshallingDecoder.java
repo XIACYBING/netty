@@ -23,12 +23,14 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.Unmarshaller;
 
 import java.io.StreamCorruptedException;
+
 /**
+ * Marshalling格式的数据解码器，当前数据解码无需区分一次解码和二次解码，只有一次操作
+ * <p>
  * Decoder which MUST be used with {@link MarshallingEncoder}.
- *
+ * <p>
  * A {@link LengthFieldBasedFrameDecoder} which use an {@link Unmarshaller} to read the Object out
  * of the {@link ByteBuf}.
- *
  */
 public class MarshallingDecoder extends LengthFieldBasedFrameDecoder {
 

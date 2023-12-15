@@ -19,10 +19,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
-
 import org.jboss.marshalling.Marshaller;
 
 /**
+ * Marshalling格式的数据编码器，当前数据编码无需区分一次编码和二次编码，只有一次操作
+ *
  * {@link MessageToByteEncoder} implementation which uses JBoss Marshalling to marshal
  * an Object. Be aware that this encoder is not compatible with an other client that just use
  * JBoss Marshalling as it includes the size of every {@link Object} that gets serialized in

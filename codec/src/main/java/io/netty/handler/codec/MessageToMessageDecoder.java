@@ -26,6 +26,8 @@ import io.netty.util.internal.TypeParameterMatcher;
 import java.util.List;
 
 /**
+ * 消息二次解码类，主要用于将消息转换为实际的Java对象（请求），以便应用程序进行处理；在二次解码之前，由{@link ByteToMessageDecoder}对网络传输来的字节数据流进行消息边界界定
+ *
  * {@link ChannelInboundHandlerAdapter} which decodes from one message to an other message.
  *
  *

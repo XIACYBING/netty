@@ -29,6 +29,8 @@ import io.netty.util.internal.TypeParameterMatcher;
 import java.util.List;
 
 /**
+ * 消息二次编码的抽象类，主要是将应用程序对外返回的实际数据编码成字节数组；在编码之后，则是由一次编码器{@link MessageToByteEncoder}对消息字节数组进行边界界定，以便进行消息发送
+ *
  * {@link ChannelOutboundHandlerAdapter} which encodes from one message to an other message
  *
  * For example here is an implementation which decodes an {@link Integer} to an {@link String}.
