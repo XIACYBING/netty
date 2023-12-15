@@ -47,11 +47,26 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class AbstractNioChannel extends AbstractChannel {
 
-    private static final InternalLogger logger =
-            InternalLoggerFactory.getInstance(AbstractNioChannel.class);
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractNioChannel.class);
 
+    /**
+     * JDK原生的channel
+     */
     private final SelectableChannel ch;
+
+    /**
+     * 感兴趣的事件
+     *
+     * @see SelectionKey#OP_READ
+     * @see SelectionKey#OP_WRITE
+     * @see SelectionKey#OP_CONNECT
+     * @see SelectionKey#OP_ACCEPT
+     */
     protected final int readInterestOp;
+
+    /**
+     * {@link #ch JDK原生channel}注册到相关{@link java.nio.channels.Selector}上之后生成的{@link SelectionKey}
+     */
     volatile SelectionKey selectionKey;
     boolean readPending;
     private final Runnable clearReadPendingRunnable = new Runnable() {
@@ -77,17 +92,24 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * @param readInterestOp    the ops to set to receive data from the {@link SelectableChannel}
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
+
+        // 调用父类构造器，会生成unsafe和pipeline
         super(parent);
+
+        // 记录JDK原生的channel
         this.ch = ch;
+
+        // 记录感兴趣的操作
         this.readInterestOp = readInterestOp;
         try {
+
+            // 配置为非阻塞   todo 阻塞和非阻塞的区别主要体现在哪部分逻辑上
             ch.configureBlocking(false);
         } catch (IOException e) {
             try {
                 ch.close();
             } catch (IOException e2) {
-                logger.warn(
-                            "Failed to close a partially initialized socket.", e2);
+                logger.warn("Failed to close a partially initialized socket.", e2);
             }
 
             throw new ChannelException("Failed to enter non-blocking mode.", e);
@@ -377,6 +399,14 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         boolean selected = false;
         for (;;) {
             try {
+
+                // 获取jdk原生的channel和eventLoop上关联的selector，向其上注册0事件，也就是不关注任何事件
+                // 需要注意的是，这里方法第三个参数att/附件，将当前channel传递进去了，
+                // 也就是说，当前代码做了两件事：将jdk原生channel注册到jdk原生selector上，并将netty的channel通过附件的形式附加进去
+                // 后续可以通过selectionKey获取到这三者：jdk原生channel、jdk原生selector和netty的channel
+
+                // 服务器channel注册流程中，注册accept事件是在当前类的doBeginRead方法中
+                // doBeginRead方法会将当前channel感兴趣的事件注册到selectionKey中，而服务器channel感兴趣的事件就是accept事件了
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -410,6 +440,9 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         readPending = true;
 
         final int interestOps = selectionKey.interestOps();
+
+        // 服务器channel：readInterestOp是accept的值，因为首次在doRegister方法中设置ops为0，因此此处&操作后等于0
+        // 等于0的情况下，会向key注册感兴趣的事件，也就是accept事件
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
         }

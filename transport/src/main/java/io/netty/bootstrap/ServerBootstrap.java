@@ -128,7 +128,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     /**
      * 设置子级的{@link ChannelHandler}，在{@link ServerBootstrap}中这是必须配置的，主要用来处理
-     * {@link io.netty.channel.socket.SocketChannel}的相关事件
+     * {@link io.netty.channel.socket.SocketChannel}的相关事件，可以理解成是代表客户端到服务器端口的通道的处理器
      * <p>
      * 虽然只能设置一个，但是我们可以使用{@link ChannelInitializer#initChannel(Channel)}，通过
      * {@link Channel#pipeline()}添加多个更子级的{@link ChannelHandler}，组成一条管道来处理输入输出数据
@@ -144,33 +144,48 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     @Override
     void init(Channel channel) {
+
+        // 将配置的channelOption添加到当前channel上
         setChannelOptions(channel, newOptionsArray(), logger);
+
+        // 将配置的attribute也添加到channel上
         setAttributes(channel, attrs0().entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY));
 
         ChannelPipeline p = channel.pipeline();
 
+        // 处理客户端channel的线程池组和处理客户端channel的处理器
         final EventLoopGroup currentChildGroup = childGroup;
         final ChannelHandler currentChildHandler = childHandler;
+
+        // 客户端channel的配置
         final Entry<ChannelOption<?>, Object>[] currentChildOptions;
         synchronized (childOptions) {
             currentChildOptions = childOptions.entrySet().toArray(EMPTY_OPTION_ARRAY);
         }
+
+        // 客户端channel的属性
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = childAttrs.entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY);
 
+        // 为服务器channel的处理器链增加一个处理器，主要用于服务端channel注册成功（registry）成功后添加相关的处理器
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+
+                // 添加配置的处理器，这里的handler其实就是ServerBootstrap.handler()添加的处理器
                 ChannelHandler handler = config.handler();
                 if (handler != null) {
                     pipeline.addLast(handler);
                 }
 
+                // 使用服务器channel的单线程线程池，执行一个添加acceptor类的任务
+                // acceptor类应该是在客户端和服务器端口建立连接后的第一个处理器
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {
-                        pipeline.addLast(new ServerBootstrapAcceptor(
-                                ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
+                        pipeline.addLast(
+                            new ServerBootstrapAcceptor(ch, currentChildGroup, currentChildHandler, currentChildOptions,
+                                currentChildAttrs));
                     }
                 });
             }

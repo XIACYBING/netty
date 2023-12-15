@@ -27,6 +27,7 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ReflectiveChannelFactory;
 import io.netty.channel.nio.AbstractNioMessageChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -249,9 +250,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     /**
+     * 绑定到对应的端口上，监听对应端口，并返回一个异步Future
+     * <p>
      * Create a new {@link Channel} and bind it.
      */
     public ChannelFuture bind(int inetPort) {
+        // 初始化一个InetSocketAddress，生成一个0.0.0.0/0.0.0.0:port的地址
         return bind(new InetSocketAddress(inetPort));
     }
 
@@ -280,18 +284,28 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+
+        // 初始化一个ServerChannel，并关联jdk原生channel、jdk原生selector和netty服务器的channel
         final ChannelFuture regFuture = initAndRegister();
+
+        // 获取netty服务器的channel
         final Channel channel = regFuture.channel();
+
+        // 执行异常，直接返回
         if (regFuture.cause() != null) {
             return regFuture;
         }
 
+        // 执行完成，直接调用doBind0
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
-        } else {
+        }
+
+        // 如果未完成，则添加一个监听器，当regFuture完成时调用监听器，完成doBind0的工作
+        else {
             // Registration future is almost always fulfilled already, but just in case it's not.
             final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
             regFuture.addListener(new ChannelFutureListener() {
@@ -318,7 +332,14 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+
+            // 通过反射初始化一个channel，一般是通过对应的无参构造器去初始化
+            // io.netty.channel.ReflectiveChannelFactory.newChannel
+            // io.netty.channel.socket.nio.NioServerSocketChannel.NioServerSocketChannel()
+            // TODO 对初始化流程深入刨析
             channel = channelFactory.newChannel();
+
+            // 初始化对应channel，主要体现在将配置添加到channel，并注册acceptor事件上
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -331,7 +352,13 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 将服务器channel注册到bossGroup线程池组上
+        // 这里做主要是向jdk原生selector上注册jdk原生channel，并将jdk原生channel、jdk原生selector和netty的channel关联在一起，生成一个selectionKey
+        // register体现在：将服务器channel注册到selector上
+        // io.netty.channel.SingleThreadEventLoop.register(io.netty.channel.Channel)
         ChannelFuture regFuture = config().group().register(channel);
+
+        // 如果注册发生异常，则关闭channel
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
                 channel.close();
@@ -363,6 +390,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         channel.eventLoop().execute(new Runnable() {
             @Override
             public void run() {
+
+                // register成功，则执行绑定
+                // 绑定链路较复杂，可以直接跳到最终执行绑定的位置查看：NioServerSocketChannel.doBind
+                // 下一步：io.netty.channel.AbstractChannel.bind(java.net.SocketAddress, io.netty.channel.ChannelPromise)
                 if (regFuture.isSuccess()) {
                     channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 } else {
@@ -375,7 +406,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * channel处理器，用于处理输入或输出的数据流，需要注意，只能设置一个，后者会覆盖前者
      * <p>
-     * 这是一个可选配置项
+     * 这是一个可选配置项，主要针对的是服务器端的{@link io.netty.channel.socket.ServerSocketChannel}，也就是{@link #channel(Class)}所设置的
+     * {@link Channel}
+     * <p>
+     * 这是一个可选配置项，主要针对的是当前应用到要监听端口的{@link Channel 通道}，也就是{@link #channel(Class)}所设置的{@link Channel}；
+     * 当实现类是{@link ServerBootstrap}时，当前设置的{@link ChannelHandler}处理的就是{@link io.netty.channel.ServerChannel}，否则处理的就是
+     * 类似{@link SocketChannel}这种代表客户端通道的{@link Channel}
      * <p>
      * the {@link ChannelHandler} to use for serving the requests.
      *

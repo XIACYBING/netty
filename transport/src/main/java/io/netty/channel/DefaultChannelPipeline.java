@@ -90,10 +90,13 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private boolean registered;
 
     protected DefaultChannelPipeline(Channel channel) {
+
+        // 记录关联的channel
         this.channel = ObjectUtil.checkNotNull(channel, "channel");
         succeededFuture = new SucceededChannelFuture(channel, null);
-        voidPromise =  new VoidChannelPromise(channel, true);
+        voidPromise = new VoidChannelPromise(channel, true);
 
+        // 初始化头节点和尾节点，这两个节点直接继承AbstractChannelHandlerContext，没有关联ChannelHandler
         tail = new TailContext(this);
         head = new HeadContext(this);
 
@@ -209,6 +212,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
             // 将当前节点插入节点链的尾部
             addLast0(newCtx);
 
+            // 如果当前channel还没注册到一个eventLoop（NioEventLoop上关联着Selector，也可以理解为还没注册accept事件）
+            // 那么我们就需要设置某些状态，并在pendingHandlerCallbackHead上添加回调，让注册完成后可以自动调用callHandlerAdded0方法
+            // 实际上就是在AbstractChannel.AbstractUnsafe.register0中执行doRegister完成后，会调用当前类的invokeHandlerAddedIfNeeded，去执行相关回调
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
             // In this case we add the context to the pipeline and add a task that will call
             // ChannelHandler.handlerAdded(...) once the channel is registered.
@@ -664,9 +670,15 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     final void invokeHandlerAddedIfNeeded() {
+
+        // 必须在channel关联的线程上
         assert channel.eventLoop().inEventLoop();
+
+        // 首次注册才需要执行这些回调
         if (firstRegistration) {
             firstRegistration = false;
+
+            // 执行所有
             // We are now registered to the EventLoop. It's time to call the callbacks for the ChannelHandlers,
             // that were added before the registration was done.
             callHandlerAddedForAllHandlers();
@@ -992,6 +1004,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
+
+        // 绑定地址
+        // io.netty.channel.AbstractChannelHandlerContext.bind(java.net.SocketAddress, io.netty.channel.ChannelPromise)
+        // 这里会从tail到head，将每个HandlerContext的方法都调用到，直到HeadContext.bind
+        // TailContext.bind -> DefaultChannelHandlerContext.bind -> ChannelHandler.bind
+        // -> （其他配置的context和channel）.bind -> HeadContext.bind -> unsafe.bind
         return tail.bind(localAddress, promise);
     }
 
@@ -1353,6 +1371,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         @Override
         public void bind(
                 ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) {
+
+            // 调用关联channel的unsafe，进行bind操作
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.bind
             unsafe.bind(localAddress, promise);
         }
 

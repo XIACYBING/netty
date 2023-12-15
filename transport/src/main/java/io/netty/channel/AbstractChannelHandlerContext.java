@@ -26,11 +26,11 @@ import io.netty.util.concurrent.OrderedEventExecutor;
 import io.netty.util.internal.ObjectPool;
 import io.netty.util.internal.ObjectPool.Handle;
 import io.netty.util.internal.ObjectPool.ObjectCreator;
-import io.netty.util.internal.PromiseNotificationUtil;
-import io.netty.util.internal.ThrowableUtil;
 import io.netty.util.internal.ObjectUtil;
+import io.netty.util.internal.PromiseNotificationUtil;
 import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.SystemPropertyUtil;
+import io.netty.util.internal.ThrowableUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -487,6 +487,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
         final AbstractChannelHandlerContext next = findContextOutbound(MASK_BIND);
         EventExecutor executor = next.executor();
+
+        // 如果当前运行线程就是eventLoop中的线程，则直接执行，否则提交到eventLoop中执行
+        // 需要注意的是，这里调用的是next的invokeBind方法，在服务器的bind流程中，一般是ServerBootstrap.handler设置的处理器，较为常见的是LoggingHandler
         if (executor.inEventLoop()) {
             next.invokeBind(localAddress, promise);
         } else {
@@ -503,7 +506,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private void invokeBind(SocketAddress localAddress, ChannelPromise promise) {
         if (invokeHandler()) {
             try {
-                ((ChannelOutboundHandler) handler()).bind(this, localAddress, promise);
+
+                // 实际的注册逻辑在这里面，获取当前handlerContext绑定的handler，调用bind接口
+                // io.netty.handler.logging.LoggingHandler.bind
+                ((ChannelOutboundHandler)handler()).bind(this, localAddress, promise);
             } catch (Throwable t) {
                 notifyOutboundHandlerException(t, promise);
             }

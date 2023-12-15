@@ -70,8 +70,14 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
+
+        // 为channel生成一个id
         id = newId();
+
+        // 生成unsafe
         unsafe = newUnsafe();
+
+        // 生成一个channel的pipeline
         pipeline = newChannelPipeline();
     }
 
@@ -245,6 +251,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     @Override
     public ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
+
+        // 绑定地址
+        // io.netty.channel.DefaultChannelPipeline.bind(java.net.SocketAddress, io.netty.channel.ChannelPromise)
         return pipeline.bind(localAddress, promise);
     }
 
@@ -451,6 +460,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
+
+            // 参数和状态校验
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
             if (isRegistered()) {
                 promise.setFailure(new IllegalStateException("registered to an event loop already"));
@@ -458,12 +469,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
             if (!isCompatible(eventLoop)) {
                 promise.setFailure(
-                        new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
+                    new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
                 return;
             }
 
             AbstractChannel.this.eventLoop = eventLoop;
 
+            // 如果当前的执行线程就是eventLoop（单线程线程池）中的线程的话，直接调用register0进行注册操作；如果不行就使用eventLoop中的线程执行注册操作
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -493,22 +505,41 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
+
+                // 执行实际的注册逻辑：服务器channel是向JDK原生selector注册accept事件
+                // io.netty.channel.nio.AbstractNioChannel.doRegister
                 doRegister();
+
+                // 状态变更
                 neverRegistered = false;
                 registered = true;
 
+                // 针对前面在ServerBootstrap.init方法中添加ServerBootstrapAcceptor的操作，以及其他的在pipeline中添加handler的操作，
+                // 会生成一个回调，当前方法的调用主要是执行那些回调
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
                 pipeline.invokeHandlerAddedIfNeeded();
 
+                // 设置成功状态
                 safeSetSuccess(promise);
+
+                // 发布channel注册成功事件，其实就是调用pipeline上所有ChannelInboundHandler的channelRegistered方法
                 pipeline.fireChannelRegistered();
+
+                // 如果当前通道激活，且当前是第一次注册，则需要发布通道激活事件
+                // 其实就是调用pipeline上所有ChannelInboundHandler的channelActive
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
                     if (firstRegistration) {
                         pipeline.fireChannelActive();
-                    } else if (config().isAutoRead()) {
+                    }
+
+                    // 如果通道之前注册过，且channel被设置了autoRead，则需要开始进行读数据
+                    // beginRead方法最终会调用到AbstractNioChannel.doBeginRead，在该方法中，会将channel感兴趣的事件注册到对应selectionKey上，
+                    // 在服务器channel上，会注册accept事件
+                    // todo 这里不太理解的是，beginRead方法是在哪里被触发的？不应该是这里，首次注册时这里被触发的逻辑应该pipeline.fireChannelActive()，而不是当前的beginRead
+                    else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read
                         // again so that we process inbound data.
                         //
@@ -528,6 +559,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
             assertEventLoop();
 
+            // 状态校验
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
                 return;
             }
@@ -547,6 +579,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             boolean wasActive = isActive();
             try {
+
+                // 执行绑定
+                // io.netty.channel.socket.nio.NioServerSocketChannel.doBind
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);

@@ -19,14 +19,15 @@ import io.netty.channel.ChannelException;
 import io.netty.channel.ChannelMetadata;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundBuffer;
-import io.netty.util.internal.SocketUtils;
 import io.netty.channel.nio.AbstractNioMessageChannel;
 import io.netty.channel.socket.DefaultServerSocketChannelConfig;
 import io.netty.channel.socket.ServerSocketChannelConfig;
 import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.SocketUtils;
 import io.netty.util.internal.SuppressJava6Requirement;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import sun.nio.ch.WindowsSelectorProvider;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -44,9 +45,13 @@ import java.util.Map;
  * NIO selector based implementation to accept new connections.
  */
 public class NioServerSocketChannel extends AbstractNioMessageChannel
-                             implements io.netty.channel.socket.ServerSocketChannel {
+    implements io.netty.channel.socket.ServerSocketChannel {
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
+
+    /**
+     * {@link java.nio.channels.Selector}的提供者，不同平台下实现不一样，windows平台下是{@link WindowsSelectorProvider}
+     */
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioServerSocketChannel.class);
@@ -72,6 +77,8 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance
      */
     public NioServerSocketChannel() {
+
+        // newSocket：使用默认的selectorProvider生成一个服务器通道/serverChannel
         this(newSocket(DEFAULT_SELECTOR_PROVIDER));
     }
 
@@ -86,7 +93,11 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      * Create a new instance using the given {@link ServerSocketChannel}.
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
+
+        // 调用父类构造器，记录感兴趣的事件：accept
         super(null, channel, SelectionKey.OP_ACCEPT);
+
+        // 生成一个config
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
     }
 
@@ -130,6 +141,8 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     protected void doBind(SocketAddress localAddress) throws Exception {
+
+        // JDK版本大于等于7和小于7的，使用两种不同的绑定方法，但都是通过jdk原生的channel进行绑定
         if (PlatformDependent.javaVersion() >= 7) {
             javaChannel().bind(localAddress, config.getBacklog());
         } else {
