@@ -142,6 +142,10 @@ public interface ChannelConfig {
     ChannelConfig setMaxMessagesPerRead(int maxMessagesPerRead);
 
     /**
+     * 最大写入次数：主要是针对大文件的写入，如果不控制最大写入次数，那么一个大文件的写入会阻塞其他流程的写入，导致其他流程必须要等待大文件写入完成后才能继续写入
+     *
+     * @see <a href=“https://www.liaoxuefeng.com/discuss/1279869501571105/1450880018677794#:~:text=WRITE_SPIN_COUNT”>计算机网络 | 从 ChanelOption 到 Netty 底层 - WRITE_SPIN_COUNT</a>
+     * <p>
      * Returns the maximum loop count for a write operation until
      * {@link WritableByteChannel#write(ByteBuffer)} returns a non-zero value.
      * It is similar to what a spin lock is used for in concurrency programming.

@@ -361,6 +361,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelHandlerContext fireChannelRead(final Object msg) {
+        // findContextInbound：获取下一个对应标志的节点
+        // invokeChannelRead：调用下一个节点的read方法
         invokeChannelRead(findContextInbound(MASK_CHANNEL_READ), msg);
         return this;
     }
@@ -774,13 +776,20 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelFuture writeAndFlush(Object msg, ChannelPromise promise) {
+
+        // 写入并刷新
         write(msg, true, promise);
         return promise;
     }
 
     void invokeWriteAndFlush(Object msg, ChannelPromise promise) {
         if (invokeHandler()) {
+
+            // 将数据写入，核心在于HeadContext#write，会通过AbstractUnsafe.write将msg加入到outboundBuffer中
             invokeWrite0(msg, promise);
+
+            // 刷新数据到客户端，同样，核心在于HeadContext.flush，会通过AbstractUnsafe.flush将outboundBuffer中的数据通过JDK原生channel写入到客户端
+            // 最终通过NioSocketChannel.doWrite调用JDK原生channel写入数据到客户端
             invokeFlush0();
         } else {
             writeAndFlush(msg, promise);
@@ -800,11 +809,15 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             throw e;
         }
 
-        final AbstractChannelHandlerContext next = findContextOutbound(flush ?
-                (MASK_WRITE | MASK_FLUSH) : MASK_WRITE);
+        // 获取下一个outbound的handlerContext
+        final AbstractChannelHandlerContext next = findContextOutbound(flush ? (MASK_WRITE | MASK_FLUSH) : MASK_WRITE);
         final Object m = pipeline.touch(msg, next);
         EventExecutor executor = next.executor();
+
+        // 确保在eventLoop的线程中处理
         if (executor.inEventLoop()) {
+
+            // 根据是否flush调用不同方法，接下来会在不同的handlerContext中处理
             if (flush) {
                 next.invokeWriteAndFlush(m, promise);
             } else {
@@ -824,6 +837,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     @Override
     public ChannelFuture writeAndFlush(Object msg) {
+
+        // 写入数据并刷新到客户端
         return writeAndFlush(msg, newPromise());
     }
 

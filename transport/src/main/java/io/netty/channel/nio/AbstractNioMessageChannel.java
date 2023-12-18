@@ -60,6 +60,9 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
     private final class NioMessageUnsafe extends AbstractNioUnsafe {
 
+        /**
+         * 读取到的内容，在NIO场景是{@link io.netty.channel.socket.nio.NioSocketChannel}
+         */
         private final List<Object> readBuf = new ArrayList<Object>();
 
         @Override
@@ -75,6 +78,9 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             try {
                 try {
                     do {
+
+                        // 读取数据，其实就是通过JDK原生channel将SocketChannel包装成NioSocketChannel加入readBuf集合中
+                        // io.netty.channel.socket.nio.NioServerSocketChannel.doReadMessages
                         int localRead = doReadMessages(readBuf);
                         if (localRead == 0) {
                             break;
@@ -90,8 +96,11 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                     exception = t;
                 }
 
+                // 循环readBuf集合，将读取来的数据（NioSocketChannel）通过pipeline发布出去
+                // NioSocketChannel：从头节点开始，一直处理到ServerBootstrapAcceptor.channelRead，
+                //   acceptor会将NioSocketChannel的配置等相关信息补全，并将其注册到childGroup上，并设置对读事件感兴趣
                 int size = readBuf.size();
-                for (int i = 0; i < size; i ++) {
+                for (int i = 0; i < size; i++) {
                     readPending = false;
                     pipeline.fireChannelRead(readBuf.get(i));
                 }
@@ -131,7 +140,11 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         final int interestOps = key.interestOps();
 
         for (;;) {
+
+            // 获取当前信息
             Object msg = in.current();
+
+            // 信息为空，已经全部写入完成，设置对write事件不感兴趣，并中断循环
             if (msg == null) {
                 // Wrote all messages.
                 if ((interestOps & SelectionKey.OP_WRITE) != 0) {
@@ -141,6 +154,9 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
             }
             try {
                 boolean done = false;
+
+                // 配置的循环次数，每次写入一定量的数据，当写入完成或循环完成的话，即结束循环
+                // 写入完成的话done为true
                 for (int i = config().getWriteSpinCount() - 1; i >= 0; i--) {
                     if (doWriteMessage(msg, in)) {
                         done = true;
@@ -148,9 +164,13 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                     }
                 }
 
+                // 如果写入完成，移除已写入的消息
                 if (done) {
                     in.remove();
-                } else {
+                }
+
+                // 否则说明没有把全部的消息写入完成，需要确保对write事件的感兴趣    todo 半包情况？
+                else {
                     // Did not write all messages.
                     if ((interestOps & SelectionKey.OP_WRITE) == 0) {
                         key.interestOps(interestOps | SelectionKey.OP_WRITE);

@@ -100,6 +100,7 @@ public class SingleThreadMode {
                                     throws InterruptedException {
                                     LOGGER.info("接收到消息：[{}]", msg);
 
+                                    // io.netty.channel.AbstractChannelHandlerContext.writeAndFlush(java.lang.Object)
                                     ChannelFuture writeFuture = ctx.writeAndFlush("received :" + msg + "\r\n");
 
                                     // 如果消息是bye，关闭客户端后并关闭服务端

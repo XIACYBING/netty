@@ -225,6 +225,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         /**
          * Read from underlying {@link SelectableChannel}
+         * <p>
+         * 通过{@link SelectableChannel}进行读取，这里的读取可能是{@link SelectionKey#OP_READ}和{@link SelectionKey#OP_ACCEPT}
          */
         void read();
 
@@ -318,15 +320,18 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // We still need to ensure we call fireChannelActive() in this case.
             boolean active = isActive();
 
+            // 如果已经取消了connect，trySuccess会返回false
             // trySuccess() will return false if a user cancelled the connection attempt.
             boolean promiseSet = promise.trySuccess();
 
+            // 如果channel曾经是未激活，但是当前激活了，那么就通过pipeline发布channelActive事件
             // Regardless if the connection attempt was cancelled, channelActive() event should be triggered,
             // because what happened is what happened.
             if (!wasActive && active) {
                 pipeline().fireChannelActive();
             }
 
+            // 如果用户手动取消了connect，那么就需要进行channel的关闭
             // If a user cancelled the connection attempt, close the channel, which is followed by channelInactive().
             if (!promiseSet) {
                 close(voidPromise());
@@ -349,11 +354,20 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // Note this method is invoked by the event loop only if the connection attempt was
             // neither cancelled nor timed out.
 
+            // 必须在当前eventLoop的线程中
             assert eventLoop().inEventLoop();
 
             try {
+
+                // channel当前是否有效
                 boolean wasActive = isActive();
+
+                // 执行finishConnect的操作
+                // io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect
+                // 只是在判断jdk原生channel是否完成了connect，如果未完成，会抛出异常
                 doFinishConnect();
+
+                // 履行connect的承诺：更新connectPromise状态，发布channelActive的事件
                 fulfillConnectPromise(connectPromise, wasActive);
             } catch (Throwable t) {
                 fulfillConnectPromise(connectPromise, annotateConnectException(t, requestedRemoteAddress));
@@ -369,6 +383,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         @Override
         protected final void flush0() {
+
+            // 如果当前对write事件不感兴趣，才调用flush刷新数据
             // Flush immediately only when there's no pending flush.
             // If there's a pending flush operation, event loop will call forceFlush() later,
             // and thus there's no need to call it now.
@@ -385,6 +401,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
         private boolean isFlushPending() {
             SelectionKey selectionKey = selectionKey();
+
+            // 当前对write事件感兴趣
             return selectionKey.isValid() && (selectionKey.interestOps() & SelectionKey.OP_WRITE) != 0;
         }
     }

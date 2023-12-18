@@ -507,7 +507,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 }
                 boolean firstRegistration = neverRegistered;
 
-                // 执行实际的注册逻辑：服务器channel是向JDK原生selector注册accept事件
+                // 执行实际的注册逻辑：服务器channel是向JDK原生selector注册，但是不对任务事件感兴趣（注册的感兴趣事件是0）
+                // 客户端NioSocketChannel同样，只是向selector注册一个0事件
                 // io.netty.channel.nio.AbstractNioChannel.doRegister
                 doRegister();
 
@@ -529,7 +530,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
                 // 如果当前通道激活，且当前是第一次注册，则需要发布通道激活事件
                 // 其实就是调用pipeline上所有ChannelInboundHandler的channelActive
-                // 首次注册的时候，isActive往往是false，因为jdk原生channel的isBound状态为false
+                // NioServerSocketChannel首次注册的时候，isActive往往是false，因为jdk原生channel的isBound状态为false
+                // NioSocketChannel首次注册的时候，isActive是true，会调用到pipeline.fireChannelActive()，
+                // 进而到AbstractNioChannel.doBeginRead，让NioSocketChannel在AbstractNioChannel.selectionKey上注册感兴趣事件（读事件）
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
@@ -955,6 +958,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             inFlush0 = true;
 
+            // channel当前无效的处理
             // Mark all pending write requests as failure if the channel is inactive.
             if (!isActive()) {
                 try {
@@ -971,6 +975,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+
+                // 执行具体的数据写入逻辑
+                // 服务器将数据写入客户端：io.netty.channel.socket.nio.NioSocketChannel#doWrite
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
                 if (t instanceof IOException && config().isAutoClose()) {

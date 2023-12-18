@@ -87,6 +87,9 @@ public abstract class MessageToMessageDecoder<I> extends ChannelInboundHandlerAd
                 @SuppressWarnings("unchecked")
                 I cast = (I) msg;
                 try {
+
+                    // 将字节消息解码，添加到out集合中
+                    // todo 一个字节消息中可能包含多个Java对象消息，或者有类似的场景？
                     decode(ctx, cast, out);
                 } finally {
                     ReferenceCountUtil.release(cast);
@@ -100,6 +103,8 @@ public abstract class MessageToMessageDecoder<I> extends ChannelInboundHandlerAd
             throw new DecoderException(e);
         } finally {
             try {
+
+                // 循环out集合，将解码完成的Java对象发布给后面的handlerContext节点去处理
                 int size = out.size();
                 for (int i = 0; i < size; i++) {
                     ctx.fireChannelRead(out.getUnsafe(i));

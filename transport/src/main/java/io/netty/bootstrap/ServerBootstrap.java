@@ -239,12 +239,16 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
             final Channel child = (Channel) msg;
 
+            // 将配置的childHandler添加到pipeline上，childHandler中一般包含多个channelHandler
             child.pipeline().addLast(childHandler);
 
+            // 设置option和attribute
             setChannelOptions(child, childOptions, logger);
             setAttributes(child, childAttrs);
 
             try {
+
+                // 注册到childGroup上
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

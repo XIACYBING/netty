@@ -295,6 +295,8 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
                     int size = out.size();
                     firedChannelRead |= out.insertSinceRecycled();
+
+                    // 字节经过处理后，会被切割成多个消息（粘包）添加到out中，调用静态方法，将out消息集合中的消息一个个的通过handlerContext.fireChannelRead发布给下一个节点
                     fireChannelRead(ctx, out, size);
                 } finally {
                     out.recycle();
@@ -322,7 +324,9 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * Get {@code numElements} out of the {@link CodecOutputList} and forward these through the pipeline.
      */
     static void fireChannelRead(ChannelHandlerContext ctx, CodecOutputList msgs, int numElements) {
-        for (int i = 0; i < numElements; i ++) {
+
+        // 循环消息集合，将消息一个个的通过handlerContext发布给后面的context节点
+        for (int i = 0; i < numElements; i++) {
             ctx.fireChannelRead(msgs.getUnsafe(i));
         }
     }

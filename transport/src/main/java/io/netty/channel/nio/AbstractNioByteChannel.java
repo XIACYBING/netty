@@ -144,8 +144,14 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             boolean close = false;
             try {
                 do {
+
+                    // 分配一块内存
                     byteBuf = allocHandle.allocate(allocator);
+
+                    // io.netty.channel.socket.nio.NioSocketChannel.doReadBytes：通过JDK原生Channel读取数据到byteBuf上
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
+
+                    // 没有读取到任何数据：释放资源，设置状态
                     if (allocHandle.lastBytesRead() <= 0) {
                         // nothing was read. release the buffer.
                         byteBuf.release();
@@ -158,8 +164,13 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         break;
                     }
 
+                    // 读取到数据：记录读取到的消息数量，设置状态
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+
+                    // 通过pipeline将读取到的字节缓存发布出去
+                    // 如果有配置编码，那么一次和二次编码器就会将字节数据转换为一个完整的消息，并转换成应用程序所需要的可处理的Java对象
+                    // 从head节点开始，直到应用程序的处理节点，然后应用程序处理节点在处理完成后，调用write相关方法把响应数据写入，最后通过headContext调用unsafe去完成写入
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
                 } while (allocHandle.continueReading());
@@ -280,20 +291,31 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         }
 
         throw new UnsupportedOperationException(
-                "unsupported message type: " + StringUtil.simpleClassName(msg) + EXPECTED_TYPES);
+            "unsupported message type: " + StringUtil.simpleClassName(msg) + EXPECTED_TYPES);
     }
 
+    /**
+     * @param setOpWrite true：数据未完全写入；false/数据已经完全写入了
+     */
     protected final void incompleteWrite(boolean setOpWrite) {
+
+        // 数据未完全写入，需要确保channel继续对write事件感兴趣
         // Did not write completely.
         if (setOpWrite) {
             setOpWrite();
-        } else {
+        }
+
+        // 否则说明数据写入完成了
+        else {
+
+            // 确保channel对write事件不感兴趣
             // It is possible that we have set the write OP, woken up by NIO because the socket is writable, and then
             // use our write quantum. In this case we no longer want to set the write OP because the socket is still
             // writable (as far as we know). We will find out next time we attempt to write if the socket is writable
             // and set the write OP if necessary.
             clearOpWrite();
 
+            // 提交一个任务，todo 干啥的任务？
             // Schedule flush again later so other tasks can be picked up in the meantime
             eventLoop().execute(flushTask);
         }

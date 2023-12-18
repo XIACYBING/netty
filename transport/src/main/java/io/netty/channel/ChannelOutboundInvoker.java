@@ -225,6 +225,8 @@ public interface ChannelOutboundInvoker {
     ChannelFuture writeAndFlush(Object msg, ChannelPromise promise);
 
     /**
+     * 写入数据并刷新到客户端，会调用当前方法的handlerContext开始，一直处理到{@link DefaultChannelPipeline.HeadContext}
+     * <p>
      * Shortcut for call {@link #write(Object)} and {@link #flush()}.
      */
     ChannelFuture writeAndFlush(Object msg);

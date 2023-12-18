@@ -83,11 +83,14 @@ public abstract class MessageToMessageEncoder<I> extends ChannelOutboundHandlerA
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         CodecOutputList out = null;
         try {
+
+            // 可以被编码的msg
             if (acceptOutboundMessage(msg)) {
                 out = CodecOutputList.newInstance();
-                @SuppressWarnings("unchecked")
-                I cast = (I) msg;
+                @SuppressWarnings("unchecked") I cast = (I)msg;
                 try {
+
+                    // 将数据编码后加入out集合中
                     encode(ctx, cast, out);
                 } finally {
                     ReferenceCountUtil.release(cast);
@@ -95,9 +98,12 @@ public abstract class MessageToMessageEncoder<I> extends ChannelOutboundHandlerA
 
                 if (out.isEmpty()) {
                     throw new EncoderException(
-                            StringUtil.simpleClassName(this) + " must produce at least one message.");
+                        StringUtil.simpleClassName(this) + " must produce at least one message.");
                 }
-            } else {
+            }
+
+            // msg无法被编码，调用ctx.write，会获取下一个handlerContext进行处理
+            else {
                 ctx.write(msg, promise);
             }
         } catch (EncoderException e) {
@@ -105,12 +111,20 @@ public abstract class MessageToMessageEncoder<I> extends ChannelOutboundHandlerA
         } catch (Throwable t) {
             throw new EncoderException(t);
         } finally {
+
+            // 处理out集合
             if (out != null) {
                 try {
                     final int sizeMinusOne = out.size() - 1;
+
+                    // out集合中有一个数据
+                    // 调用context.write处理，会获取下一个handlerContext进行处理
                     if (sizeMinusOne == 0) {
                         ctx.write(out.getUnsafe(0), promise);
-                    } else if (sizeMinusOne > 0) {
+                    }
+
+                    // out集合中有多个数据
+                    else if (sizeMinusOne > 0) {
                         // Check if we can use a voidPromise for our extra writes to reduce GC-Pressure
                         // See https://github.com/netty/netty/issues/2525
                         if (promise == ctx.voidPromise()) {
