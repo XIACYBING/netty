@@ -284,6 +284,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     @Override
     public Channel read() {
+        // io.netty.channel.DefaultChannelPipeline.read
         pipeline.read();
         return this;
     }
@@ -528,6 +529,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
                 // 如果当前通道激活，且当前是第一次注册，则需要发布通道激活事件
                 // 其实就是调用pipeline上所有ChannelInboundHandler的channelActive
+                // 首次注册的时候，isActive往往是false，因为jdk原生channel的isBound状态为false
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
                 if (isActive()) {
@@ -589,7 +591,12 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 首次active，则需要向pipeline发布channelActive的事件
+            // 当serverChannelConfig的autoRead为true时，会触发到doBeginRead方法，在AbstractNioChannel
+            // .doBeginRead中，会将当前channel感兴趣的事件通过SelectionKey注册到相关的Selector上，NioServerSocketChannel感兴趣的事件就是accept
             if (!wasActive && isActive()) {
+
+                // 提交发布channelActive的任务到eventLoop中，会在执行完bind后再去执行，因为serverChannel的相关逻辑很多都是在单线程eventLoop中处理的
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
@@ -875,6 +882,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+                // 执行beginRead，这里面会进行感兴趣的操作的注册，通过selectionKey注册
+                // io.netty.channel.nio.AbstractNioMessageChannel.doBeginRead
                 doBeginRead();
             } catch (final Exception e) {
                 invokeLater(new Runnable() {

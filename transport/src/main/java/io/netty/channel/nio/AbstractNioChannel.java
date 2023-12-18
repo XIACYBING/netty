@@ -407,6 +407,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
                 // 服务器channel注册流程中，注册accept事件是在当前类的doBeginRead方法中
                 // doBeginRead方法会将当前channel感兴趣的事件注册到selectionKey中，而服务器channel感兴趣的事件就是accept事件了
+                // doBeginRead则是通过AbstractChannel.bind中，pipeline.fireChannelActive去触发的：当autoRead为true时，会通过SelectionKey自动注册channel感兴趣的事件到selector上
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {

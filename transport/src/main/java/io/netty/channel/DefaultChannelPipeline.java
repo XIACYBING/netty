@@ -926,6 +926,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelPipeline fireChannelActive() {
+
+        // 从head节点开发，触发channelActive方法
         AbstractChannelHandlerContext.invokeChannelActive(head);
         return this;
     }
@@ -1041,6 +1043,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelPipeline read() {
+        // io.netty.channel.AbstractChannelHandlerContext.read
         tail.read();
         return this;
     }
@@ -1440,6 +1443,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         public void channelActive(ChannelHandlerContext ctx) {
             ctx.fireChannelActive();
 
+            // 如果配置了autoRead，则自动开始读取
             readIfIsAutoRead();
         }
 
@@ -1462,6 +1466,8 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         private void readIfIsAutoRead() {
             if (channel.config().isAutoRead()) {
+                // io.netty.channel.AbstractChannel.read
+                // 通过channel读
                 channel.read();
             }
         }

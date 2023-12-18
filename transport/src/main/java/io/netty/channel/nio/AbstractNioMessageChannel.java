@@ -54,6 +54,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         if (inputShutdown) {
             return;
         }
+        // io.netty.channel.nio.AbstractNioChannel.doBeginRead
         super.doBeginRead();
     }
 

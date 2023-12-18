@@ -136,7 +136,7 @@ public class SingleThreadMode {
             // 绑定端口，阻塞线程等待关闭
             (channels[0] = server.bind(SERVER_PORT).sync().channel()).closeFuture().sync();
         } finally {
-            server.config().group().shutdownGracefully();
+            server.config().group().shutdownGracefully().sync();
         }
     }
 
@@ -254,7 +254,7 @@ public class SingleThreadMode {
 
                 LOGGER.info("通道关闭完成");
             } finally {
-                client.config().group().shutdownGracefully();
+                client.config().group().shutdownGracefully().sync();
             }
         }
     }

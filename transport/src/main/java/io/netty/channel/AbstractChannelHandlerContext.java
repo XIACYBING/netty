@@ -212,6 +212,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
     static void invokeChannelActive(final AbstractChannelHandlerContext next) {
         EventExecutor executor = next.executor();
+
+        // 要求在eventLoop的线程池中去触发channelActive方法
+        // io.netty.channel.AbstractChannelHandlerContext.invokeChannelActive()
+        // HeadContext
         if (executor.inEventLoop()) {
             next.invokeChannelActive();
         } else {
@@ -225,9 +229,12 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     private void invokeChannelActive() {
+
+        // handler可用，则触发handler的channelActive方法
+        // io.netty.channel.DefaultChannelPipeline.HeadContext.channelActive
         if (invokeHandler()) {
             try {
-                ((ChannelInboundHandler) handler()).channelActive(this);
+                ((ChannelInboundHandler)handler()).channelActive(this);
             } catch (Throwable t) {
                 invokeExceptionCaught(t);
             }
@@ -673,6 +680,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     public ChannelHandlerContext read() {
         final AbstractChannelHandlerContext next = findContextOutbound(MASK_READ);
         EventExecutor executor = next.executor();
+
+        // 调用实际的context.read()
+        // HeadContext
+        // io.netty.channel.AbstractChannelHandlerContext.invokeRead
         if (executor.inEventLoop()) {
             next.invokeRead();
         } else {
@@ -689,7 +700,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private void invokeRead() {
         if (invokeHandler()) {
             try {
-                ((ChannelOutboundHandler) handler()).read(this);
+                // handler读
+                // io.netty.channel.DefaultChannelPipeline.HeadContext.read
+                ((ChannelOutboundHandler)handler()).read(this);
             } catch (Throwable t) {
                 invokeExceptionCaught(t);
             }
