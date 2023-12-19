@@ -402,6 +402,9 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             // 按照配置的大小，将in内存中的数据分割，并获取到对应的ByteBuffer数组和数组数量
             // Ensure the pending writes are made of ByteBufs only.
             int maxBytesPerGatheringWrite = ((NioSocketChannelConfig)config).getMaxBytesPerGatheringWrite();
+
+            // in的类型是ChannelOutboundBuffer，是ByteBuf的一个单链表，而ByteBuf则是对JDK原生ByteBuffer的一个包装，
+            // 所以这里直接根据最大切块数量1024，和每块最大字节数将所有数据转换为一组ByteBuffer数组
             ByteBuffer[] nioBuffers = in.nioBuffers(1024, maxBytesPerGatheringWrite);
             int nioBufferCnt = in.nioBufferCount();
 

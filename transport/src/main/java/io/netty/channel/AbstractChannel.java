@@ -904,6 +904,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             assertEventLoop();
 
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
+
+            // outboundBuffer为空，说明channel已经关闭，需要失败并释放msg
             if (outboundBuffer == null) {
                 // If the outboundBuffer is null we know the channel was closed and so
                 // need to fail the future right away. If it is not null the handling of the rest
@@ -917,7 +919,12 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             int size;
             try {
+
+                // 过滤消息，交由各子类实现，每个子类要求的ByteBuf类型不一样，所以当前方法执行后，msg的类型可能发生变化
+                // NioSocketChannel调用的是：io.netty.channel.nio.AbstractNioByteChannel.filterOutboundMessage
                 msg = filterOutboundMessage(msg);
+
+                // 计算消息大小
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;
@@ -928,6 +935,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 添加到outbound缓存中
             outboundBuffer.addMessage(msg, size, promise);
         }
 

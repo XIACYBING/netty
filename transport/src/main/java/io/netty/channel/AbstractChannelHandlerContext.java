@@ -802,6 +802,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     void invokeWriteAndFlush(Object msg, ChannelPromise promise) {
         if (invokeHandler()) {
 
+            // 之所以将write和flush两个区分开来，是因为ChannelHandler的write和flush是分开的，所以需要分开调用，解耦
+
             // 将数据写入，核心在于HeadContext#write，会通过AbstractUnsafe.write将msg加入到outboundBuffer中
             invokeWrite0(msg, promise);
 

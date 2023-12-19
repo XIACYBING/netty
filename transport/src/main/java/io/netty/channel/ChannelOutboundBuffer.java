@@ -112,7 +112,11 @@ public final class ChannelOutboundBuffer {
      * the message was written.
      */
     public void addMessage(Object msg, int size, ChannelPromise promise) {
+
+        // 包装消息为entry
         Entry entry = Entry.newInstance(msg, size, total(msg), promise);
+
+        // 单链表处理，将当前消息包装的entry接到队列尾部
         if (tailEntry == null) {
             flushedEntry = null;
         } else {
@@ -120,10 +124,13 @@ public final class ChannelOutboundBuffer {
             tail.next = entry;
         }
         tailEntry = entry;
+
+        // 必要时将当前消息的entry标记成unflushedEntry，即未被刷新的entry
         if (unflushedEntry == null) {
             unflushedEntry = entry;
         }
 
+        // 记录未被刷新的缓存大小
         // increment pending bytes after adding message to the unflushed arrays.
         // See https://github.com/netty/netty/issues/1619
         incrementPendingOutboundBytes(entry.pendingSize, false);
