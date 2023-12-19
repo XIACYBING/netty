@@ -66,9 +66,13 @@ public abstract class AbstractByteBuf extends ByteBuf {
     }
 
     static final ResourceLeakDetector<ByteBuf> leakDetector =
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
+        ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);
 
     int readerIndex;
+
+    /**
+     * 写入数据的索引
+     */
     int writerIndex;
     private int markedReaderIndex;
     private int markedWriterIndex;
@@ -1129,11 +1133,20 @@ public abstract class AbstractByteBuf extends ByteBuf {
 
     @Override
     public int writeBytes(ScatteringByteChannel in, int length) throws IOException {
+
+        // 确保有足够的内存用来存放读取的数据
         ensureWritable(length);
+
+        // 读取数据
+        // io.netty.buffer.PooledByteBuf.setBytes(int, java.nio.channels.ScatteringByteChannel, int)
         int writtenBytes = setBytes(writerIndex, in, length);
+
+        // 如果有读取到数据，则推进writeIndex
         if (writtenBytes > 0) {
             writerIndex += writtenBytes;
         }
+
+        // 返回读取到的字节数据长度
         return writtenBytes;
     }
 

@@ -33,6 +33,7 @@ import java.net.NetworkInterface;
  *
  * @param <T> the type of the value which is valid for the {@link ChannelOption}
  * @see io.netty.bootstrap.AbstractBootstrap#option(ChannelOption, Object)
+ * @see <a href="https://www.liaoxuefeng.com/discuss/1279869501571105/1450880018677794">计算机网络 | 从 ChanelOption 到 Netty 底层</a>
  */
 public class ChannelOption<T> extends AbstractConstant<ChannelOption<T>> {
 

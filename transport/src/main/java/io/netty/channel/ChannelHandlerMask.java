@@ -17,9 +17,9 @@ package io.netty.channel;
 
 import io.netty.util.concurrent.FastThreadLocal;
 import io.netty.util.internal.PlatformDependent;
-
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
@@ -35,7 +35,7 @@ import java.util.WeakHashMap;
 final class ChannelHandlerMask {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ChannelHandlerMask.class);
 
-    // Using to mask which methods must be called for a ChannelHandler.
+    /** Using to mask which methods must be called for a ChannelHandler. */
     static final int MASK_EXCEPTION_CAUGHT = 1;
     static final int MASK_CHANNEL_REGISTERED = 1 << 1;
     static final int MASK_CHANNEL_UNREGISTERED = 1 << 2;
@@ -54,21 +54,37 @@ final class ChannelHandlerMask {
     static final int MASK_WRITE = 1 << 15;
     static final int MASK_FLUSH = 1 << 16;
 
-    static final int MASK_ONLY_INBOUND =  MASK_CHANNEL_REGISTERED |
-            MASK_CHANNEL_UNREGISTERED | MASK_CHANNEL_ACTIVE | MASK_CHANNEL_INACTIVE | MASK_CHANNEL_READ |
-            MASK_CHANNEL_READ_COMPLETE | MASK_USER_EVENT_TRIGGERED | MASK_CHANNEL_WRITABILITY_CHANGED;
+    /**
+     * {@link ChannelInboundHandler}下除异常捕获方法外，所有方法的标记，通过比特位来标记某个handler的相关方法是否需要被执行
+     */
+    static final int MASK_ONLY_INBOUND =
+        MASK_CHANNEL_REGISTERED | MASK_CHANNEL_UNREGISTERED | MASK_CHANNEL_ACTIVE | MASK_CHANNEL_INACTIVE
+            | MASK_CHANNEL_READ | MASK_CHANNEL_READ_COMPLETE | MASK_USER_EVENT_TRIGGERED
+            | MASK_CHANNEL_WRITABILITY_CHANGED;
+
+    /**
+     * {@link ChannelInboundHandler}下所有方法的标记，通过比特位来标记某个handler的相关方法是否需要被执行
+     */
     private static final int MASK_ALL_INBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_INBOUND;
-    static final int MASK_ONLY_OUTBOUND =  MASK_BIND | MASK_CONNECT | MASK_DISCONNECT |
-            MASK_CLOSE | MASK_DEREGISTER | MASK_READ | MASK_WRITE | MASK_FLUSH;
+
+    /**
+     * {@link ChannelOutboundHandler}下除异常捕获方法外，所有方法的标记，通过比特位来标记某个handler的相关方法是否需要被执行
+     */
+    static final int MASK_ONLY_OUTBOUND =
+        MASK_BIND | MASK_CONNECT | MASK_DISCONNECT | MASK_CLOSE | MASK_DEREGISTER | MASK_READ | MASK_WRITE | MASK_FLUSH;
+
+    /**
+     * {@link ChannelOutboundHandler}下所有方法的标记，通过比特位来标记某个handler的相关方法是否需要被执行
+     */
     private static final int MASK_ALL_OUTBOUND = MASK_EXCEPTION_CAUGHT | MASK_ONLY_OUTBOUND;
 
     private static final FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>> MASKS =
-            new FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>>() {
-                @Override
-                protected Map<Class<? extends ChannelHandler>, Integer> initialValue() {
-                    return new WeakHashMap<Class<? extends ChannelHandler>, Integer>(32);
-                }
-            };
+        new FastThreadLocal<Map<Class<? extends ChannelHandler>, Integer>>() {
+            @Override
+            protected Map<Class<? extends ChannelHandler>, Integer> initialValue() {
+                return new WeakHashMap<Class<? extends ChannelHandler>, Integer>(32);
+            }
+        };
 
     /**
      * Return the {@code executionMask}.
@@ -79,7 +95,11 @@ final class ChannelHandlerMask {
         Map<Class<? extends ChannelHandler>, Integer> cache = MASKS.get();
         Integer mask = cache.get(clazz);
         if (mask == null) {
+
+            // 计算可执行标记
             mask = mask0(clazz);
+
+            // 将映射放入缓存中
             cache.put(clazz, mask);
         }
         return mask;
@@ -87,6 +107,8 @@ final class ChannelHandlerMask {
 
     /**
      * Calculate the {@code executionMask}.
+     * <p>
+     * 计算可执行的标记：根据{@code handlerType}判断当前方法有哪些可执行的，哪些需要跳过：被{@link Skip}注解标记的方法需要被跳过
      */
     private static int mask0(Class<? extends ChannelHandler> handlerType) {
         int mask = MASK_EXCEPTION_CAUGHT;
@@ -163,9 +185,12 @@ final class ChannelHandlerMask {
         return mask;
     }
 
+    /**
+     * @return true/存在对应方法，且方法被{@link Skip}注解标记，false/不存在对应方法（一般不会）或方法没有被{@link Skip}注解标记
+     */
     @SuppressWarnings("rawtypes")
-    private static boolean isSkippable(
-            final Class<?> handlerType, final String methodName, final Class<?>... paramTypes) throws Exception {
+    private static boolean isSkippable(final Class<?> handlerType, final String methodName,
+        final Class<?>... paramTypes) throws Exception {
         return AccessController.doPrivileged(new PrivilegedExceptionAction<Boolean>() {
             @Override
             public Boolean run() throws Exception {
@@ -174,8 +199,8 @@ final class ChannelHandlerMask {
                     m = handlerType.getMethod(methodName, paramTypes);
                 } catch (NoSuchMethodException e) {
                     if (logger.isDebugEnabled()) {
-                        logger.debug(
-                            "Class {} missing method {}, assume we can not skip execution", handlerType, methodName, e);
+                        logger.debug("Class {} missing method {}, assume we can not skip execution", handlerType,
+                            methodName, e);
                     }
                     return false;
                 }

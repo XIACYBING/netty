@@ -30,6 +30,29 @@ import java.nio.channels.Channels;
  *
  * 关联着对应的{@link Channel}
  *
+ * 发布事件：通过{@code fire}相关方法发布事件，这些{@code fire}方法会获取符合要求的后置或前置节点（inbound相关方法看的是后置节点，outbound相关方法看的是前置节点），然后调用后置或前置节点的相关方法
+ * @see #fireChannelActive()
+ * @see #fireChannelInactive()
+ * @see #fireChannelRegistered()
+ * @see #fireChannelUnregistered()
+ * @see #fireChannelRead(Object)
+ * @see #fireChannelReadComplete()
+ * @see #fireChannelWritabilityChanged()
+ * @see #fireUserEventTriggered(Object)
+ * @see #fireExceptionCaught(Throwable)
+ *
+ * 每个{@link ChannelHandlerContext}/{@link ChannelHandler}只有在调用了{@code fire}
+ * 相关方法后，相关事件才会继续向后置/前置节点流转，否则事件就会中止在当前处理节点，因此业务相关的{@link ChannelHandler}最好放在最后一个节点
+ *
+ * 如果一个事件，比如read，在业务节点还继续调用{@link #fireChannelRead(Object)}，那也不会有任何问题，read
+ * 事件会继续流转，直到{@link io.netty.channel.DefaultChannelPipeline.TailContext#channelRead}，但是在尾节点的read方法处理中，也只是单纯的打印debug
+ * 日志，不做任何处理就是了；这么做的原因有以下两点：
+ * <ol>
+ *     <li>实现{@link ChannelPipeline}的完整性，有头有尾</li>
+ *     <li>对资源做一个回收，比如read事件，如果最终到了{@link io.netty.channel.DefaultChannelPipeline.TailContext#channelRead}，
+ *     那么最终会对{@code msg}做一个可能存在的{@link ByteBuf}资源回收  todo 那么正常链路是会怎么回收？</li>
+ * </ol>
+ *
  * Enables a {@link ChannelHandler} to interact with its {@link ChannelPipeline}
  * and other handlers. Among other things a handler can notify the next {@link ChannelHandler} in the
  * {@link ChannelPipeline} as well as modify the {@link ChannelPipeline} it belongs to dynamically.

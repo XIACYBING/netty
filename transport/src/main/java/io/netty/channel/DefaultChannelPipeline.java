@@ -40,6 +40,50 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
+ * 默认pipeline实现，通过当前类的{@code fire}相关方法去发布相关事件，相关事件一般从{@link #head}节点开始处理，然后处理到对应的业务节点，然后业务节点视情况看是否回写数据给客户段
+ * <p>
+ * 发布事件：
+ *
+ * @see #fireChannelActive()
+ * @see #fireChannelInactive()
+ * @see #fireChannelRegistered()
+ * @see #fireChannelUnregistered()
+ * @see #fireChannelRead(Object)
+ * @see #fireChannelReadComplete()
+ * @see #fireChannelWritabilityChanged()
+ * @see #fireUserEventTriggered(Object)
+ * @see #fireExceptionCaught(Throwable)
+ *
+ * <p>
+ * 管理pipeline节点：
+ * <p>
+ * @see #addFirst
+ * @see #addFirst0
+ * @see #addLast
+ * @see #addLast0
+ * @see #addBefore
+ * @see #addBefore0
+ * @see #addAfter
+ * @see #addAfter0
+ * @see #remove
+ * @see #removeFirst
+ * @see #removeLast
+ * @see #removeIfExists
+ *
+ * <p>
+ * 部分pipeline操作：
+ * <p>
+ * @see #write
+ * @see #writeAndFlush
+ * @see #connect
+ * @see #disconnect
+ * @see #bind
+ * @see #close
+ * @see #destroy
+ * @see #flush
+ * @see #deregister
+ *
+ * <p>
  * The default {@link ChannelPipeline} implementation.  It is usually created
  * by a {@link Channel} implementation when the {@link Channel} is created.
  */
@@ -51,17 +95,25 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private static final String TAIL_NAME = generateName0(TailContext.class);
 
     private static final FastThreadLocal<Map<Class<?>, String>> nameCaches =
-            new FastThreadLocal<Map<Class<?>, String>>() {
-        @Override
-        protected Map<Class<?>, String> initialValue() {
-            return new WeakHashMap<Class<?>, String>();
-        }
-    };
+        new FastThreadLocal<Map<Class<?>, String>>() {
+            @Override
+            protected Map<Class<?>, String> initialValue() {
+                return new WeakHashMap<Class<?>, String>();
+            }
+        };
 
     private static final AtomicReferenceFieldUpdater<DefaultChannelPipeline, MessageSizeEstimator.Handle> ESTIMATOR =
-            AtomicReferenceFieldUpdater.newUpdater(
-                    DefaultChannelPipeline.class, MessageSizeEstimator.Handle.class, "estimatorHandle");
+        AtomicReferenceFieldUpdater.newUpdater(DefaultChannelPipeline.class, MessageSizeEstimator.Handle.class,
+            "estimatorHandle");
+
+    /**
+     * 头节点，一般是{@link HeadContext}
+     */
     final AbstractChannelHandlerContext head;
+
+    /**
+     * 尾节点，一般是{@link TailContext}
+     */
     final AbstractChannelHandlerContext tail;
 
     private final Channel channel;
@@ -119,6 +171,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return touch ? ReferenceCountUtil.touch(msg, next) : msg;
     }
 
+    /**
+     * 将{@link ChannelHandler}包装为{@link AbstractChannelHandlerContext}
+     */
     private AbstractChannelHandlerContext newContext(EventExecutorGroup group, String name, ChannelHandler handler) {
         return new DefaultChannelHandlerContext(this, childExecutor(group), name, handler);
     }

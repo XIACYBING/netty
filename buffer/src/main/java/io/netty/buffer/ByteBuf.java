@@ -1304,6 +1304,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract int setBytes(int index, InputStream in, int length) throws IOException;
 
     /**
+     * 从{@code index}开始，从{@code in}中读取{@code length}长度的数据
+     *
      * Transfers the content of the specified source channel to this buffer
      * starting at the specified absolute {@code index}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
@@ -2022,6 +2024,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     public abstract int writeBytes(InputStream in, int length) throws IOException;
 
     /**
+     * 从JDK原生Channel上读取对应{@code length}的字节数据
+     *
      * Transfers the content of the specified channel to this buffer
      * starting at the current {@code writerIndex} and increases the
      * {@code writerIndex} by the number of the transferred bytes.

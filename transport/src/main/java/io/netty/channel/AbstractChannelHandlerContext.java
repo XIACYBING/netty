@@ -68,14 +68,22 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             AtomicIntegerFieldUpdater.newUpdater(AbstractChannelHandlerContext.class, "handlerState");
 
     /**
+     * context添加到pipeline上未完成
+     * <p>
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} is about to be called.
      */
     private static final int ADD_PENDING = 1;
+
     /**
+     * context添加到pipeline上已完成
+     * <p>
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} was called.
      */
     private static final int ADD_COMPLETE = 2;
+
     /**
+     * context从pipeline上已移除
+     * <p>
      * {@link ChannelHandler#handlerRemoved(ChannelHandlerContext)} was called.
      */
     private static final int REMOVE_COMPLETE = 3;
@@ -88,6 +96,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private final DefaultChannelPipeline pipeline;
     private final String name;
     private final boolean ordered;
+
+    /**
+     * 可执行的标记，标记当前handler在哪些场景下需要被回调
+     */
     private final int executionMask;
 
     // Will be set to null if no child executor should be used, otherwise it will be set to the
@@ -106,6 +118,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         this.name = ObjectUtil.checkNotNull(name, "name");
         this.pipeline = pipeline;
         this.executor = executor;
+
+        // 根据handler类的方法，为handler做出标记：标记当前handler需要进行哪些方法的回调
         this.executionMask = mask(handlerClass);
         // Its ordered if its driven by the EventLoop or the given Executor is an instanceof OrderedEventExecutor.
         ordered = executor == null || executor instanceof OrderedEventExecutor;
@@ -238,7 +252,10 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             } catch (Throwable t) {
                 invokeExceptionCaught(t);
             }
-        } else {
+        }
+
+        // 如果handler不可用，则直接发布active事件给后置节点
+        else {
             fireChannelActive();
         }
     }
@@ -897,16 +914,19 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
 
         if (!allowVoidPromise && promise instanceof VoidChannelPromise) {
             throw new IllegalArgumentException(
-                    StringUtil.simpleClassName(VoidChannelPromise.class) + " not allowed for this operation");
+                StringUtil.simpleClassName(VoidChannelPromise.class) + " not allowed for this operation");
         }
 
         if (promise instanceof AbstractChannel.CloseFuture) {
             throw new IllegalArgumentException(
-                    StringUtil.simpleClassName(AbstractChannel.CloseFuture.class) + " not allowed in a pipeline");
+                StringUtil.simpleClassName(AbstractChannel.CloseFuture.class) + " not allowed in a pipeline");
         }
         return false;
     }
 
+    /**
+     * 根据{@code mask}筛选进站的context链路中，当前节点后的下一个符合要求的{@link ChannelInboundHandler}节点
+     */
     private AbstractChannelHandlerContext findContextInbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         EventExecutor currentExecutor = executor();
@@ -916,6 +936,9 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
         return ctx;
     }
 
+    /**
+     * 根据{@code mask}筛选出站的context链路中，当前节点后的上一个符合要求的{@link ChannelOutboundHandler}节点
+     */
     private AbstractChannelHandlerContext findContextOutbound(int mask) {
         AbstractChannelHandlerContext ctx = this;
         EventExecutor currentExecutor = executor();
@@ -996,6 +1019,8 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     private boolean invokeHandler() {
         // Store in local variable to reduce volatile reads.
         int handlerState = this.handlerState;
+
+        // 当前handler已经可用，或（如果不要求排序，则handler处于PENDING状态也可用）
         return handlerState == ADD_COMPLETE || (!ordered && handlerState == ADD_PENDING);
     }
 

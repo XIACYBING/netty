@@ -37,13 +37,17 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
     protected int length;
     int maxLength;
     PoolThreadCache cache;
+
+    /**
+     * JDK原生ByteBuffer，用于从JDK原生Channel中读取数据
+     */
     ByteBuffer tmpNioBuf;
     private ByteBufAllocator allocator;
 
     @SuppressWarnings("unchecked")
     protected PooledByteBuf(Handle<? extends PooledByteBuf<T>> recyclerHandle, int maxCapacity) {
         super(maxCapacity);
-        this.recyclerHandle = (Handle<PooledByteBuf<T>>) recyclerHandle;
+        this.recyclerHandle = (Handle<PooledByteBuf<T>>)recyclerHandle;
     }
 
     void init(PoolChunk<T> chunk, ByteBuffer nioBuffer,
@@ -184,9 +188,17 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
     }
 
     final ByteBuffer _internalNioBuffer(int index, int length, boolean duplicate) {
+
+        // 计算出实际要操作的索引（有偏移量）
         index = idx(index);
+
+        // 当前链路duplicate为false，也就是直接使用ByteBuf内部关联的ByteBuffer
         ByteBuffer buffer = duplicate ? newInternalNioBuffer(memory) : internalNioBuffer();
+
+        // 设置limit/可用限制和position/当前索引
         buffer.limit(index + length).position(index);
+
+        // 返回JDK原生ByteBuffer
         return buffer;
     }
 
@@ -197,7 +209,11 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 
     @Override
     public final ByteBuffer internalNioBuffer(int index, int length) {
+
+        // 校验索引和长度
         checkIndex(index, length);
+
+        // 获取当前关联的JDK原生ByteBuffer
         return _internalNioBuffer(index, length, false);
     }
 
@@ -250,6 +266,8 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
     @Override
     public final int setBytes(int index, ScatteringByteChannel in, int length) throws IOException {
         try {
+
+            // 获取Netty的ByteBuf关联的JDK原生ByteBuffer，用来在in中读取数据
             return in.read(internalNioBuffer(index, length));
         } catch (ClosedChannelException ignored) {
             return -1;
