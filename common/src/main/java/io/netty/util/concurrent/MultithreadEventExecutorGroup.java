@@ -33,15 +33,19 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     private final EventExecutor[] children;
     private final Set<EventExecutor> readonlyChildren;
     private final AtomicInteger terminatedChildren = new AtomicInteger();
+
+    /**
+     * 线程池中止future，在构造器中有针对所有子级线程池的{@code terminationFuture}增加一个完成的监听器，当所有子级线程池终止完成时，当前线程池也就终止完成了
+     */
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
 
     /**
      * Create a new instance.
      *
-     * @param nThreads          the number of threads that will be used by this instance.
-     * @param threadFactory     the ThreadFactory to use, or {@code null} if the default should be used.
-     * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
+     * @param nThreads      the number of threads that will be used by this instance.
+     * @param threadFactory the ThreadFactory to use, or {@code null} if the default should be used.
+     * @param args          arguments which will passed to each {@link #newChild(Executor, Object...)} call
      */
     protected MultithreadEventExecutorGroup(int nThreads, ThreadFactory threadFactory, Object... args) {
         this(nThreads, threadFactory == null ? null : new ThreadPerTaskExecutor(threadFactory), args);
@@ -110,15 +114,19 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
         chooser = chooserFactory.newChooser(children);
 
+        // 创建子级线程池终止监听器，每个子级线程池终止完成后都需要调用下当前方法
         final FutureListener<Object> terminationListener = new FutureListener<Object>() {
             @Override
             public void operationComplete(Future<Object> future) throws Exception {
+
+                // 已终止的子级线程池自增，当所有子级线程池都终止完成了，当前线程池的terminationFuture就可以设置为success了
                 if (terminatedChildren.incrementAndGet() == children.length) {
                     terminationFuture.setSuccess(null);
                 }
             }
         };
 
+        // 为每个子级线程池添加终止监听器
         for (EventExecutor e: children) {
             e.terminationFuture().addListener(terminationListener);
         }
@@ -159,7 +167,10 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 
     @Override
     public Future<?> shutdownGracefully(long quietPeriod, long timeout, TimeUnit unit) {
-        for (EventExecutor l: children) {
+
+        // 循环每个子级的线程池（子级线程池一般是单线程的线程池），按照相同参数调用对应的优雅关闭线程池的方法
+        // io.netty.util.concurrent.SingleThreadEventExecutor.shutdownGracefully
+        for (EventExecutor l : children) {
             l.shutdownGracefully(quietPeriod, timeout, unit);
         }
         return terminationFuture();
@@ -212,12 +223,19 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     public boolean awaitTermination(long timeout, TimeUnit unit)
             throws InterruptedException {
         long deadline = System.nanoTime() + unit.toNanos(timeout);
-        loop: for (EventExecutor l: children) {
-            for (;;) {
+
+        // 循环子级线程池，等待子级线程池关闭完成
+        loop:
+        for (EventExecutor l : children) {
+            for (; ; ) {
                 long timeLeft = deadline - System.nanoTime();
+
+                // 超时，不再等待
                 if (timeLeft <= 0) {
                     break loop;
                 }
+
+                // 等待当前子级线程池关闭完成
                 if (l.awaitTermination(timeLeft, TimeUnit.NANOSECONDS)) {
                     break;
                 }

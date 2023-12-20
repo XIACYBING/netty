@@ -297,6 +297,8 @@ public final class ChannelOutboundBuffer {
 
     private boolean remove0(Throwable cause, boolean notifyWritability) {
         Entry e = flushedEntry;
+
+        // e为空，说明已经处理完成，清理buffer（数组内容设置为null），并对外返回false（外部可以中止循环）
         if (e == null) {
             clearNioBuffers();
             return false;
@@ -312,10 +314,14 @@ public final class ChannelOutboundBuffer {
             // only release message, fail and decrement if it was not canceled before.
             ReferenceCountUtil.safeRelease(msg);
 
+            // 设置flush操作失败
             safeFail(promise, cause);
+
+            // 减少pending的缓存大小
             decrementPendingOutboundBytes(size, false, notifyWritability);
         }
 
+        // 回收entry
         // recycle the entry
         e.recycle();
 
@@ -663,7 +669,9 @@ public final class ChannelOutboundBuffer {
 
         try {
             inFail = true;
-            for (;;) {
+
+            // 死循环处理每一个还未flush完成的操作，设置为false，并回收相关entry
+            for (; ; ) {
                 if (!remove0(cause, notify)) {
                     break;
                 }

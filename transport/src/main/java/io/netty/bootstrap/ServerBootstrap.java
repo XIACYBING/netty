@@ -249,6 +249,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             try {
 
                 // 注册到childGroup上
+                // 注册逻辑：io.netty.channel.MultithreadEventLoopGroup.register(io.netty.channel.Channel)
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

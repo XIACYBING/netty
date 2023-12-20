@@ -135,7 +135,7 @@ public class SingleThreadMode {
                 });
 
             // 绑定端口，阻塞线程等待关闭
-            (channels[0] = server.bind(SERVER_PORT).sync().channel()).closeFuture().sync();
+            // (channels[0] = server.bind(SERVER_PORT).sync().channel()).closeFuture().sync();
         } finally {
             server.config().group().shutdownGracefully().sync();
         }

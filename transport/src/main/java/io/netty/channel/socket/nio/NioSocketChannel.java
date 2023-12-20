@@ -339,7 +339,11 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
 
     @Override
     protected void doClose() throws Exception {
+
+        // 清理connect相关的资源
         super.doClose();
+
+        // 调用JDK原生的channel并关闭
         javaChannel().close();
     }
 

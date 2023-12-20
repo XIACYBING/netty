@@ -45,16 +45,17 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * Abstract base class for {@link OrderedEventExecutor}'s that execute all its submitted tasks in a single thread.
- *
  */
 public abstract class SingleThreadEventExecutor extends AbstractScheduledEventExecutor implements OrderedEventExecutor {
 
-    static final int DEFAULT_MAX_PENDING_EXECUTOR_TASKS = Math.max(16,
-            SystemPropertyUtil.getInt("io.netty.eventexecutor.maxPendingTasks", Integer.MAX_VALUE));
+    static final int DEFAULT_MAX_PENDING_EXECUTOR_TASKS =
+        Math.max(16, SystemPropertyUtil.getInt("io.netty.eventexecutor.maxPendingTasks", Integer.MAX_VALUE));
 
-    private static final InternalLogger logger =
-            InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(SingleThreadEventExecutor.class);
 
+    /**
+     * ST应该是SingleThread的缩写，这些状态代表的是当前线程池下的单线程的启动状态
+     */
     private static final int ST_NOT_STARTED = 1;
     private static final int ST_STARTED = 2;
     private static final int ST_SHUTTING_DOWN = 3;
@@ -69,10 +70,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     };
 
     private static final AtomicIntegerFieldUpdater<SingleThreadEventExecutor> STATE_UPDATER =
-            AtomicIntegerFieldUpdater.newUpdater(SingleThreadEventExecutor.class, "state");
+        AtomicIntegerFieldUpdater.newUpdater(SingleThreadEventExecutor.class, "state");
     private static final AtomicReferenceFieldUpdater<SingleThreadEventExecutor, ThreadProperties> PROPERTIES_UPDATER =
-            AtomicReferenceFieldUpdater.newUpdater(
-                    SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
+        AtomicReferenceFieldUpdater.newUpdater(SingleThreadEventExecutor.class, ThreadProperties.class,
+            "threadProperties");
 
     private final Queue<Runnable> taskQueue;
 
@@ -82,30 +83,51 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private final Executor executor;
     private volatile boolean interrupted;
 
+    /**
+     * 线程池锁，当线程池关闭完成后，就会完成倒计时
+     */
     private final CountDownLatch threadLock = new CountDownLatch(1);
     private final Set<Runnable> shutdownHooks = new LinkedHashSet<Runnable>();
+
+    /**
+     * 看字面含义应该是添加任务后是否立刻唤醒（阻塞），但是看了下该字段的使用，都是取反后再使用，使用的逻辑也是唤醒，所以这个含义可能是添加任务后不立刻唤醒，如果是false代表需要立刻唤醒？
+     * NioEventLoop的默认值为false
+     */
     private final boolean addTaskWakesUp;
     private final int maxPendingTasks;
     private final RejectedExecutionHandler rejectedExecutionHandler;
 
+    /**
+     * 上一次{@link #taskQueue}中的任务的执行的纳秒数
+     */
     private long lastExecutionTime;
 
-    @SuppressWarnings({ "FieldMayBeFinal", "unused" })
+    @SuppressWarnings( {"FieldMayBeFinal", "unused"})
     private volatile int state = ST_NOT_STARTED;
 
+    /**
+     * 优雅关闭的静默周期：静默周期的存在，会让netty尽量运行完所有需要运行的任务，直到超时
+     */
     private volatile long gracefulShutdownQuietPeriod;
+
+    /**
+     * 优雅关闭超时的纳秒数
+     */
     private volatile long gracefulShutdownTimeout;
     private long gracefulShutdownStartTime;
 
+    /**
+     * 线程池终止的Future，当线程池终止成功则设置为success
+     */
     private final Promise<?> terminationFuture = new DefaultPromise<Void>(GlobalEventExecutor.INSTANCE);
 
     /**
      * Create a new instance
      *
-     * @param parent            the {@link EventExecutorGroup} which is the parent of this instance and belongs to it
-     * @param threadFactory     the {@link ThreadFactory} which will be used for the used {@link Thread}
-     * @param addTaskWakesUp    {@code true} if and only if invocation of {@link #addTask(Runnable)} will wake up the
-     *                          executor thread
+     * @param parent         the {@link EventExecutorGroup} which is the parent of this instance and belongs to it
+     * @param threadFactory  the {@link ThreadFactory} which will be used for the used {@link Thread}
+     * @param addTaskWakesUp {@code true} if and only if invocation of {@link #addTask(Runnable)} will wake up the
+     *                       executor thread
      */
     protected SingleThreadEventExecutor(
             EventExecutorGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp) {
@@ -374,6 +396,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
         do {
             fetchedAll = fetchFromScheduledTaskQueue();
+
+            // 执行任务队列中的任务，如果有任务被执行了，则此处会返回true
             if (runAllTasksFrom(taskQueue)) {
                 ranAtLeastOne = true;
             }
@@ -549,6 +573,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     protected void wakeup(boolean inEventLoop) {
+
+        // 如果当前的执行线程不是当前线程池下的单线程，则向任务队列提交一个唤醒任务
         if (!inEventLoop) {
             // Use offer as we actually only need this to unblock the thread and if offer fails we do not care as there
             // is already something in the queue.
@@ -626,17 +652,26 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
         ObjectUtil.checkNotNull(unit, "unit");
 
+        // 如果当前已经在关闭过程中（其他线程在执行关闭），则直接返回对应的终止Future
         if (isShuttingDown()) {
             return terminationFuture();
         }
 
+        // 判断当前的执行线程是否是当前线程池的线程
         boolean inEventLoop = inEventLoop();
         boolean wakeup;
         int oldState;
-        for (;;) {
+
+        // 死循环变更状态，变更完成才结束循环
+        for (; ; ) {
+
+            // 二次检查，如果有其他其他线程在执行则直接犯迷糊
             if (isShuttingDown()) {
                 return terminationFuture();
             }
+
+            // 根据当前线程池的状态，判断后续线程池的新状态
+            // 在启动或未启动时，新状态为关闭中/ST_SHUTTING_DOWN；其他状态下新状态就是老状态
             int newState;
             wakeup = true;
             oldState = state;
@@ -648,24 +683,36 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                     case ST_STARTED:
                         newState = ST_SHUTTING_DOWN;
                         break;
+
+                    // 如果走到default，说明状态是线程正在关闭、已关闭或已终止，此处无需唤醒阻塞（wakeup），newState直接使用oldState即可
                     default:
                         newState = oldState;
                         wakeup = false;
                 }
             }
+
+            // CAS原子变更state字段的值，变更成功则中止循环，失败则继续循环
             if (STATE_UPDATER.compareAndSet(this, oldState, newState)) {
                 break;
             }
         }
+
+        // 设置优雅关闭周期纳秒和超时纳秒
         gracefulShutdownQuietPeriod = unit.toNanos(quietPeriod);
         gracefulShutdownTimeout = unit.toNanos(timeout);
 
+        // 确保当前线程池的线程有启动，如果没有启动且启动失败了，则返回true，此处直接返回terminationFuture
         if (ensureThreadStarted(oldState)) {
             return terminationFuture;
         }
 
+        // 需要唤醒线程/selector
         if (wakeup) {
+
+            // 提交一个空任务到任务集合中，如果任务集合中有任务，NioEventLoop会使用selectNow的策略，不会让selector阻塞
             taskQueue.offer(WAKEUP_TASK);
+
+            // 根据配置唤醒selector，addTaskWakesUp在NioEventLoop场景下的默认值为false
             if (!addTaskWakesUp) {
                 wakeup(inEventLoop);
             }
@@ -743,45 +790,62 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
+     * 确认线程池关闭，当前方法会被多次执行，以确保某些资源（主要是{@link #taskQueue}中的任务）被处理完成
+     * <p>
      * Confirm that the shutdown if the instance should be done now!
      */
     protected boolean confirmShutdown() {
+
+        // 当前非正在关闭，直接返回
         if (!isShuttingDown()) {
             return false;
         }
 
+        // 要求必须是当前线程池关联的线程来执行
         if (!inEventLoop()) {
             throw new IllegalStateException("must be invoked from an event loop");
         }
 
+        // 取消相关的调度任务
         cancelScheduledTasks();
 
+        // 设置优雅关闭的开始纳秒数
         if (gracefulShutdownStartTime == 0) {
             gracefulShutdownStartTime = ScheduledFutureTask.nanoTime();
         }
 
+        // runAllTasks：执行所有任务队列中的任务，当有任务被执行了，则返回true
+        // runShutdownHooks：执行所有关闭的钩子，当有钩子被执行完成了，则返回true
         if (runAllTasks() || runShutdownHooks()) {
+
+            // 已经关闭了，直接返回true
             if (isShutdown()) {
                 // Executor shut down - no new tasks anymore.
                 return true;
             }
 
+            // 如果不需要等待，则直接返回
             // There were tasks in the queue. Wait a little bit more until no tasks are queued for the quiet period or
             // terminate if the quiet period is 0.
             // See https://github.com/netty/netty/issues/4241
             if (gracefulShutdownQuietPeriod == 0) {
                 return true;
             }
+
+            // 否则提交一个唤醒任务并返回false
             taskQueue.offer(WAKEUP_TASK);
             return false;
         }
 
+        // 执行到此说明没有任何任务或钩子需要执行
         final long nanoTime = ScheduledFutureTask.nanoTime();
 
+        // 如果已经关闭了，或者当前纳秒数减去优雅关闭操作开始纳秒数得出的结果不在超时时间内（超时了），则对外返回true，代表可以中止关闭操作
         if (isShutdown() || nanoTime - gracefulShutdownStartTime > gracefulShutdownTimeout) {
             return true;
         }
 
+        // 如果当前纳秒数减去上次任务执行事件小于等于静默周期，则再添加一个唤醒任务，在休眠一百毫秒让外界的run任务继续执行，在下一个循环来判断关闭是否成功
         if (nanoTime - lastExecutionTime <= gracefulShutdownQuietPeriod) {
             // Check if any tasks were added to the queue every 100ms.
             // TODO: Change the behavior of takeTask() so that it returns on timeout.
@@ -795,11 +859,17 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             return false;
         }
 
+        // 超过静默周期...
+        // 在最近的静默周期内没有任务被添加，很有希望关闭线程池，对外直接返回true
+        // 很有希望：无法保证没有用户在自行添加任务
         // No tasks were added for last quiet period - hopefully safe to shut down.
         // (Hopefully because we really cannot make a guarantee that there will be no execute() calls by a user.)
         return true;
     }
 
+    /**
+     * 等待线程池结束，当前方法一般在{@link MultithreadEventExecutorGroup#awaitTermination}中被调用到
+     */
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
         ObjectUtil.checkNotNull(unit, "unit");
@@ -807,6 +877,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             throw new IllegalStateException("cannot await termination of the current thread");
         }
 
+        // 等待线程池结束
         threadLock.await(timeout, unit);
 
         return isTerminated();
@@ -975,26 +1046,36 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     private void doStartThread() {
         assert thread == null;
+
+        // 向线程池提交一个任务，并将执行任务的线程赋值给thread
         executor.execute(new Runnable() {
             @Override
             public void run() {
+
+                // 将当前执行任务的线程赋值给thread
                 thread = Thread.currentThread();
+
+                // 中断线程
                 if (interrupted) {
                     thread.interrupt();
                 }
 
                 boolean success = false;
+
+                // 更新任务最后执行时间
                 updateLastExecutionTime();
                 try {
+
+                    // 执行run方法，这个方法中包含着一个死循环，进行selector的相关处理，并在线程池被关闭的时候跳出循环
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {
                     logger.warn("Unexpected exception from an event executor: ", t);
                 } finally {
-                    for (;;) {
+                    for (; ; ) {
                         int oldState = state;
-                        if (oldState >= ST_SHUTTING_DOWN || STATE_UPDATER.compareAndSet(
-                                SingleThreadEventExecutor.this, oldState, ST_SHUTTING_DOWN)) {
+                        if (oldState >= ST_SHUTTING_DOWN || STATE_UPDATER.compareAndSet(SingleThreadEventExecutor.this,
+                            oldState, ST_SHUTTING_DOWN)) {
                             break;
                         }
                     }
@@ -1009,15 +1090,18 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                     }
 
                     try {
+
+                        // 再次确认关闭：执行所有剩余的任务和关闭钩子任务，在当前这个时间点线程池处于关闭中的状态，还在使用静默周期/quietPeriod来运行需要被执行的任务
                         // Run all remaining tasks and shutdown hooks. At this point the event loop
                         // is in ST_SHUTTING_DOWN state still accepting tasks which is needed for
                         // graceful shutdown with quietPeriod.
-                        for (;;) {
+                        for (; ; ) {
                             if (confirmShutdown()) {
                                 break;
                             }
                         }
 
+                        // 修改状态为SHUTDOWN
                         // Now we want to make sure no more tasks can be added from this point. This is
                         // achieved by switching the state. Any new tasks beyond this point will be rejected.
                         for (;;) {
@@ -1028,26 +1112,42 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                             }
                         }
 
+                        // 继续执行，这里需要将剩余的所有任务运行完成
                         // We have the final set of tasks in the queue now, no more can be added, run all remaining.
                         // No need to loop here, this is the final pass.
                         confirmShutdown();
                     } finally {
                         try {
+
+                            // 清理资源，在NioEventLoop中是关闭selector
                             cleanup();
                         } finally {
+
+                            // 移除threadLocal内存上的所有内容
                             // Lets remove all FastThreadLocals for the Thread as we are about to terminate and notify
                             // the future. The user may block on the future and once it unblocks the JVM may terminate
                             // and start unloading classes.
                             // See https://github.com/netty/netty/issues/6596.
                             FastThreadLocal.removeAll();
 
+                            // 更新线程池状态为terminated
                             STATE_UPDATER.set(SingleThreadEventExecutor.this, ST_TERMINATED);
+
+                            // threadLock倒计时，如果用户使用awaitTermination等待线程池终结，就是阻塞在threadLock上的
                             threadLock.countDown();
+
+                            // 获取当前未执行/流失的任务总数
+                            // 因为任务队列的处理可能是并发的，其他线程可能在上面最后一次执行confirmShutdown之后又往任务队列中添加任务了
                             int numUserTasks = drainTasks();
+
+                            // 打印警告日志，不做其他处理
                             if (numUserTasks > 0 && logger.isWarnEnabled()) {
-                                logger.warn("An event executor terminated with " +
-                                        "non-empty task queue (" + numUserTasks + ')');
+                                logger.warn(
+                                    "An event executor terminated with " + "non-empty task queue (" + numUserTasks
+                                        + ')');
                             }
+
+                            // 当前单线程线程池的关闭完成
                             terminationFuture.setSuccess(null);
                         }
                     }

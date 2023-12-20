@@ -445,6 +445,8 @@ public abstract class AbstractNioChannel extends AbstractChannel {
 
     @Override
     protected void doDeregister() throws Exception {
+
+        // 取消关联的SelectionKey
         eventLoop().cancel(selectionKey());
     }
 
@@ -549,12 +551,15 @@ public abstract class AbstractNioChannel extends AbstractChannel {
     @Override
     protected void doClose() throws Exception {
         ChannelPromise promise = connectPromise;
+
+        // connectPromise设置为连接失败    todo 可以了解下connectPromise的生命周期
         if (promise != null) {
             // Use tryFailure() instead of setFailure() to avoid the race against cancel().
             promise.tryFailure(new ClosedChannelException());
             connectPromise = null;
         }
 
+        // 设置连接超时
         ScheduledFuture<?> future = connectTimeoutFuture;
         if (future != null) {
             future.cancel(false);

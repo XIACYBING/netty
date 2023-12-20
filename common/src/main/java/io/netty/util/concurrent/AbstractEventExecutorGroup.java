@@ -23,7 +23,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static io.netty.util.concurrent.AbstractEventExecutor.*;
+import static io.netty.util.concurrent.AbstractEventExecutor.DEFAULT_SHUTDOWN_QUIET_PERIOD;
+import static io.netty.util.concurrent.AbstractEventExecutor.DEFAULT_SHUTDOWN_TIMEOUT;
 
 
 /**
@@ -67,6 +68,10 @@ public abstract class AbstractEventExecutorGroup implements EventExecutorGroup {
 
     @Override
     public Future<?> shutdownGracefully() {
+
+        // 优雅关闭线程池，指定周期和超时时间
+        // 当前方法只是修改子级线程池一些状态和属性的值，并唤醒相关子级线程池的select()阻塞，让子级线程池开始自行terminate
+        // io.netty.util.concurrent.MultithreadEventExecutorGroup.shutdownGracefully
         return shutdownGracefully(DEFAULT_SHUTDOWN_QUIET_PERIOD, DEFAULT_SHUTDOWN_TIMEOUT, TimeUnit.SECONDS);
     }
 

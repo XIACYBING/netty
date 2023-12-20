@@ -530,7 +530,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
                 // 如果当前通道激活，且当前是第一次注册，则需要发布通道激活事件
                 // 其实就是调用pipeline上所有ChannelInboundHandler的channelActive
+
                 // NioServerSocketChannel首次注册的时候，isActive往往是false，因为jdk原生channel的isBound状态为false
+
                 // NioSocketChannel首次注册的时候，isActive是true，会调用到pipeline.fireChannelActive()，
                 // 进而到AbstractNioChannel.doBeginRead，让NioSocketChannel在AbstractNioChannel.selectionKey上注册感兴趣事件（读事件）
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
@@ -646,9 +648,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void close(final ChannelPromise promise) {
+
+            // 确保执行线程是关联单线程池的线程
             assertEventLoop();
 
             ClosedChannelException closedChannelException = new ClosedChannelException();
+
+            // 关闭channel
             close(promise, closedChannelException, closedChannelException, false);
         }
 
@@ -726,10 +732,14 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         private void close(final ChannelPromise promise, final Throwable cause,
                            final ClosedChannelException closeCause, final boolean notify) {
+
+            // 校验状态
             if (!promise.setUncancellable()) {
                 return;
             }
 
+            // 如果channel关闭状态已经初始化过了，则判断关闭是否成功，如果成功则直接设置promise为true
+            // 此处判断也是为了防止重复关闭
             if (closeInitiated) {
                 if (closeFuture.isDone()) {
                     // Closed already.
@@ -746,29 +756,46 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 关闭状态初始化
             closeInitiated = true;
 
             final boolean wasActive = isActive();
+
+            // 置空写数据缓存，后面会对该缓存进行清理和回收
             final ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             this.outboundBuffer = null; // Disallow adding any messages and flushes to outboundBuffer.
+
+            // 有关闭线程池的情况下使用线程池执行任务，没有线程池的情况下直接执行channel关闭任务
+            // 在channel关闭完成后，会失效所有还在outboundBuffer中的消息数据，并关闭对应outboundBuffer，并发布channel的inactive和deregister事件
+            // NioServerSocketChannel是没有closeExecutor的
+            // NioSocketChannel则会由NioSocketChannelUnsafe#prepareToClose帮忙准备，一般是GlobalEventExecutor#INSTANCE实例
             Executor closeExecutor = prepareToClose();
             if (closeExecutor != null) {
                 closeExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
+                            // 执行具体的channel关闭逻辑，主要交由各自类实现，比如NioSocketChannel主要是调用JDK原生channel的close方法
                             // Execute the close.
                             doClose0(promise);
                         } finally {
+
+                            // 向当前channel关联的eventLoop提交一个任务，用来刷新outboundBuffer和发布相关事件
                             // Call invokeLater so closeAndDeregister is executed in the EventLoop again!
                             invokeLater(new Runnable() {
                                 @Override
                                 public void run() {
+
+                                    // 清理回收对外输出的内存，并将还未发送的操作失败掉
                                     if (outboundBuffer != null) {
                                         // Fail all the queued messages
                                         outboundBuffer.failFlushed(cause, notify);
                                         outboundBuffer.close(closeCause);
                                     }
+
+                                    // 发布channel的inactive和deregister的事件，先deregister，再inactive
+                                    // 在相关的doRegister方法中，会将channel关联的SelectionKey取消掉
+                                    // io.netty.channel.nio.AbstractNioChannel.doDeregister
                                     fireChannelInactiveAndDeregister(wasActive);
                                 }
                             });
@@ -801,7 +828,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         private void doClose0(ChannelPromise promise) {
             try {
+
+                // 关闭channel
+                // io.netty.channel.socket.nio.NioSocketChannel.doClose
+                // io.netty.channel.socket.nio.NioServerSocketChannel.doClose
                 doClose();
+
+                // 设置相关标识
                 closeFuture.setClosed();
                 safeSetSuccess(promise);
             } catch (Throwable t) {

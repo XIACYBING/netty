@@ -440,6 +440,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 try {
 
                     // 根据selectNow()和hasTask的值，获取当前的select的策略
+                    // hasTasks为true，则采用selectorNow()方法的返回值，该返回值代表当前selector有多少事件就绪，这种时候不会进行任务和select操作，会直接跳过接下来的switch
+                    // 否则返回SelectStrategy.SELECT的值
                     strategy = selectStrategy.calculateStrategy(selectNowSupplier, hasTasks());
                     switch (strategy) {
 
@@ -467,6 +469,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                             try {
 
                                 // 如果当前无任务（BossGroup一般的任务就是accept，ChildGroup可能会积压任务），则直接调用select，判断当前有多少就绪事件
+                                // 在关闭流程下，这里的select方法阻塞也会被唤醒
                                 if (!hasTasks()) {
                                     strategy = select(curDeadlineNanos);
                                 }
@@ -544,15 +547,23 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 // Harmless exception - log anyway
                 if (logger.isDebugEnabled()) {
                     logger.debug(CancelledKeyException.class.getSimpleName() + " raised by a Selector {} - JDK bug?",
-                            selector, e);
+                        selector, e);
                 }
             } catch (Throwable t) {
                 handleLoopException(t);
             }
+
+            // 当前还在for循环中，每次for循环的最后都要判断当前线程池的状态
             // Always handle shutdown even if the loop processing threw an exception.
             try {
+
+                // 当前线程池状态如果是正在关闭，则需要进行关联channel和相关资源的关闭清理，剩余任务的处理，以及线程池本身的一些资源回收，钩子处理
                 if (isShuttingDown()) {
+
+                    // 关联SelectionKey、Channel和相关资源的关闭清理
                     closeAll();
+
+                    // 线程池剩余任务的处理、资源回收和钩子处理，执行完成后会对外返回，回到SingleThreadEventExecutor.doStartThread中，进行线程池的关闭工作
                     if (confirmShutdown()) {
                         return;
                     }
@@ -615,6 +626,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     @Override
     protected void cleanup() {
         try {
+
+            // 关闭selector
             selector.close();
         } catch (IOException e) {
             logger.warn("Failed to close a selector.", e);
@@ -796,22 +809,35 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     private void closeAll() {
+
+        // 再次调用selectNow，确认当前的就绪事件
         selectAgain();
+
+        // 获取当前注册在selector上的所有事件
         Set<SelectionKey> keys = selector.keys();
         Collection<AbstractNioChannel> channels = new ArrayList<AbstractNioChannel>(keys.size());
-        for (SelectionKey k: keys) {
+
+        // 循环事件集合，获取关联在上面的channel，加入集合中；如果关联在上面的NioTask，则直接进行unRegister的处理
+        for (SelectionKey k : keys) {
             Object a = k.attachment();
+
+            // 如果关联的是channel，则不对SelectionKey做任何处理，只是记录关联的channel
+            // 对应的SelectionKey将在channel关闭完成后再cancel：io.netty.channel.nio.AbstractNioChannel.doDeregister
             if (a instanceof AbstractNioChannel) {
-                channels.add((AbstractNioChannel) a);
-            } else {
+                channels.add((AbstractNioChannel)a);
+            }
+
+            // 如果关联的是NioTask，则取消SelectionKey，并unregister掉task
+            else {
                 k.cancel();
-                @SuppressWarnings("unchecked")
-                NioTask<SelectableChannel> task = (NioTask<SelectableChannel>) a;
+                @SuppressWarnings("unchecked") NioTask<SelectableChannel> task = (NioTask<SelectableChannel>)a;
                 invokeChannelUnregistered(task, k, null);
             }
         }
 
+        // 关闭所有关联的channel
         for (AbstractNioChannel ch: channels) {
+            // io.netty.channel.AbstractChannel.AbstractUnsafe.close(io.netty.channel.ChannelPromise)
             ch.unsafe().close(ch.unsafe().voidPromise());
         }
     }
@@ -826,6 +852,9 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     @Override
     protected void wakeup(boolean inEventLoop) {
+
+        // 如果当前执行线程不是当前但线程池下的线程，且nextWakeupNanos之前的状态非AWAKE（需要唤醒），则进行selector的唤醒
+        // selector的唤醒可以中断select相关的阻塞流程，让任务继续进行
         if (!inEventLoop && nextWakeupNanos.getAndSet(AWAKE) != AWAKE) {
             selector.wakeup();
         }
